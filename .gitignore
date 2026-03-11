@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+
+# Virtual environment
+tintuc/
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+
+# Flask / migrations cache
+instance/
+.pytest_cache/
+.mypy_cache/
+
+# VS Code
+.vscode/
+
+# Node / Vite / React
+FE/node_modules/
+node_modules/
+dist/
+build/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Optional: Python build files
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Postman
+.postman/
+postman/
