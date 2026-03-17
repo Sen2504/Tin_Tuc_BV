@@ -15,6 +15,8 @@ import SubCategoryCreatePage from "./pages/SubCategoryCreatePage";
 import SubCategoryUpdatePage from "./pages/SubCategoryUpdatePage";
 import CreatePostPage from "./pages/CreatePostPage";
 import CategoryPage from "./pages/CategoryPage";
+import SubCategoryPage from "./pages/SubCategoryPage";
+import PostPage from "./pages/PostPage";
 
 export default function App() {
   return (
@@ -26,6 +28,8 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/:categorySlug" element={<CategoryPage />} />
+          <Route path="/:categorySlug/:subcategorySlug" element={<SubCategoryPage />} />
+          <Route path="/:categorySlug/:subcategorySlug/:postSlug" element={<PostPage />} />
         </Route>
         
         {/* Các trang có dùng AdminLayout */}
