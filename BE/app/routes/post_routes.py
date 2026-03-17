@@ -61,6 +61,7 @@ def create_post():
         "post": {
             "id": post.id,
             "title": post.title,
+            "slug": post.slug,
             "content": post.content,
             "status": post.status,
             "hashtag": post.hashtag,
@@ -70,3 +71,29 @@ def create_post():
             "updated_at": post.update_at.isoformat() if post.update_at else None,
         }
     }), 201
+
+@post_bp.route("/<string:category_slug>/<string:subcategory_slug>", methods=["GET"])
+def get_posts_by_subcategory(category_slug, subcategory_slug):
+    data, error = PostService.get_posts_by_subcategory_slugs(
+        category_slug=category_slug,
+        subcategory_slug=subcategory_slug
+    )
+
+    if error:
+        return jsonify({"error": error}), 404
+
+    return jsonify(data), 200
+
+
+@post_bp.route("/<string:category_slug>/<string:subcategory_slug>/<string:post_slug>", methods=["GET"])
+def get_post_detail(category_slug, subcategory_slug, post_slug):
+    data, error = PostService.get_post_detail_by_slugs(
+        category_slug=category_slug,
+        subcategory_slug=subcategory_slug,
+        post_slug=post_slug
+    )
+
+    if error:
+        return jsonify({"error": error}), 404
+
+    return jsonify(data), 200
