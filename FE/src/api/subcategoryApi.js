@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = `${API_BASE_URL}/api`;
 
 export async function getSubCategoriesApi() {
 
@@ -24,40 +25,55 @@ export async function getSubCategoryByIdApi(id) {
 
 }
 
-export async function createSubCategoryApi(payload) {
+export async function createSubCategoryApi(form) {
+  const formData = new FormData();
+
+  formData.append("name", form.name);
+  formData.append("description", form.description || "");
+  formData.append("status", String(form.status));
+  formData.append("category_id", form.category_id);
+
+  if (form.thumbnail) {
+    formData.append("thumbnail", form.thumbnail);
+  }
 
   const res = await fetch(`${API_BASE}/subcategories`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
+    body: formData,
   });
 
   const data = await res.json();
 
   return {
     ok: res.ok,
-    data
+    data,
   };
-
 }
 
-export async function updateSubCategoryApi(id, payload) {
+export async function updateSubCategoryApi(id, form) {
+  const formData = new FormData();
+
+  if (form.name !== undefined) formData.append("name", form.name);
+  if (form.description !== undefined) formData.append("description", form.description);
+  if (form.status !== undefined) formData.append("status", String(form.status));
+  if (form.category_id !== undefined) formData.append("category_id", form.category_id);
+  if (form.remove_thumbnail !== undefined) {
+    formData.append("remove_thumbnail", String(form.remove_thumbnail));
+  }
+
+  if (form.thumbnail) {
+    formData.append("thumbnail", form.thumbnail);
+  }
 
   const res = await fetch(`${API_BASE}/subcategories/${id}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
+    body: formData,
   });
 
   const data = await res.json();
 
   return {
     ok: res.ok,
-    data
+    data,
   };
-
 }

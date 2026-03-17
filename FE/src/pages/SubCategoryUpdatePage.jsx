@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -6,159 +6,397 @@ import {
   getSubCategoryByIdApi
 } from "../api/subcategoryApi";
 
+import { toSlugPreview } from "../utils/slugPreview";
+
 const API_BASE = "http://localhost:5000/api";
+const API_ORIGIN = "http://localhost:5000";
 
 export default function SubCategoryUpdatePage() {
-
   const navigate = useNavigate();
   const { id } = useParams();
 
   const [categories, setCategories] = useState([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [currentThumbnail, setCurrentThumbnail] = useState(null);
 
   const [form, setForm] = useState({
     name: "",
     description: "",
     category_id: "",
-    status: true
+    status: true,
+    thumbnail: null,
+    remove_thumbnail: false,
   });
 
-  const [message, setMessage] = useState("");
+  const slugPreview = useMemo(() => toSlugPreview(form.name), [form.name]);
+
+  const previewUrl = useMemo(() => {
+    if (!form.thumbnail) return "";
+    return URL.createObjectURL(form.thumbnail);
+  }, [form.thumbnail]);
 
   useEffect(() => {
-
-    loadCategories();
-    loadSubCategory();
-
+    loadInitialData();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  async function loadInitialData() {
+    await Promise.all([loadCategories(), loadSubCategory()]);
+  }
+
   async function loadCategories() {
+    try {
+      setLoadingCategories(true);
 
-    const res = await fetch(`${API_BASE}/categories`);
-    const data = await res.json();
+      const res = await fetch(`${API_BASE}/categories`);
+      const data = await res.json();
 
-    setCategories(data.categories || []);
-
+      setCategories(data.categories || []);
+    } catch {
+      setMessage("Không tải được danh sách category");
+    } finally {
+      setLoadingCategories(false);
+    }
   }
 
   async function loadSubCategory() {
+    try {
+      setLoading(true);
+      setMessage("");
 
-    const result = await getSubCategoryByIdApi(id);
+      const result = await getSubCategoryByIdApi(id);
 
-    if (!result.ok) {
-      setMessage("Cannot load subcategory");
-      return;
+      if (!result.ok) {
+        setMessage("Cannot load subcategory");
+        return;
+      }
+
+      const subcategory = result.data;
+
+      setForm({
+        name: subcategory.name || "",
+        description: subcategory.description || "",
+        category_id: subcategory.category_id ? String(subcategory.category_id) : "",
+        status: !!subcategory.status,
+        thumbnail: null,
+        remove_thumbnail: false,
+      });
+
+      setCurrentThumbnail(subcategory.thumbnail || null);
+    } finally {
+      setLoading(false);
     }
-
-    setForm(result.data);
-
   }
 
   function handleChange(e) {
+    const { name, value, type, checked, files } = e.target;
 
-    const { name, value, type, checked } = e.target;
+    if (type === "file") {
+      const selectedFile = files && files[0] ? files[0] : null;
 
-    setForm({
-      ...form,
-      [name]: type === "checkbox" ? checked : value
-    });
+      setForm((prev) => ({
+        ...prev,
+        [name]: selectedFile,
+        remove_thumbnail: false,
+      }));
 
-  }
-
-  async function handleSubmit(e) {
-
-    e.preventDefault();
-
-    const result = await updateSubCategoryApi(id, form);
-
-    if (!result.ok) {
-      setMessage(result.data?.error || "Update failed");
       return;
     }
 
-    navigate("/subcategory/list");
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value
+    }));
+  }
 
+  function handleRemoveSelectedThumbnail() {
+    setForm((prev) => ({
+      ...prev,
+      thumbnail: null,
+    }));
+  }
+
+  function handleRemoveCurrentThumbnail() {
+    setCurrentThumbnail(null);
+    setForm((prev) => ({
+      ...prev,
+      thumbnail: null,
+      remove_thumbnail: true,
+    }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setMessage("");
+
+    if (!form.name.trim()) {
+      setMessage("Tên subcategory là bắt buộc");
+      return;
+    }
+
+    if (!form.category_id) {
+      setMessage("Vui lòng chọn category");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const result = await updateSubCategoryApi(id, {
+        name: form.name.trim(),
+        description: form.description,
+        category_id: form.category_id,
+        status: form.status,
+        remove_thumbnail: form.remove_thumbnail,
+        thumbnail: form.thumbnail,
+      });
+
+      if (!result.ok) {
+        setMessage(result.data?.error || "Update failed");
+        return;
+      }
+
+      navigate("/subcategory/list");
+    } catch {
+      setMessage("Có lỗi xảy ra khi cập nhật subcategory");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-
-    <div className="max-w-xl rounded-2xl bg-white p-6 shadow">
-
-      <h2 className="mb-6 text-xl font-bold">
-        Update SubCategory
-      </h2>
-
-      {message && (
-        <p className="text-red-500 mb-4">{message}</p>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-
-        <div>
-          <label>Name</label>
-          <input
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          />
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm">
+        <div className="border-b border-zinc-200 px-6 py-5 sm:px-8">
+          <h2 className="text-2xl font-bold text-zinc-800">
+            Cập nhật SubCategory
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Chỉnh sửa thông tin subcategory và thay đổi thumbnail nếu cần.
+          </p>
         </div>
 
-        <div>
-          <label>Description</label>
-          <textarea
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          />
-        </div>
+        <div className="px-6 py-6 sm:px-8">
+          {message && (
+            <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+              {message}
+            </div>
+          )}
 
-        <div>
-          <label>Category</label>
-
-          <select
-            name="category_id"
-            value={form.category_id}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
+          <form
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 gap-6 lg:grid-cols-2"
           >
+            <div className="space-y-5">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-zinc-700">
+                  Tên subcategory
+                </label>
+                <input
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Nhập tên subcategory"
+                  className="w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  disabled={loading}
+                  required
+                />
+              </div>
 
-            {categories.map((cat) => (
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-zinc-700">
+                  Slug tự động
+                </label>
+                <input
+                  value={slugPreview || "slug-se-duoc-tao-tu-dong"}
+                  readOnly
+                  disabled={loading}
+                  className="w-full rounded-2xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-sm text-zinc-500 outline-none"
+                />
+                <p className="mt-2 text-xs text-zinc-500">
+                  Khi đổi tên subcategory, backend sẽ tự sinh lại slug mới và tự xử lý chống trùng.
+                </p>
+              </div>
 
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-zinc-700">
+                  Mô tả
+                </label>
+                <textarea
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  rows={6}
+                  placeholder="Nhập mô tả ngắn cho subcategory"
+                  className="w-full rounded-2xl border border-zinc-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  disabled={loading}
+                />
+              </div>
 
-            ))}
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-zinc-700">
+                  Category cha
+                </label>
+                <select
+                  name="category_id"
+                  value={form.category_id}
+                  onChange={handleChange}
+                  disabled={loading || loadingCategories}
+                  className="w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  required
+                >
+                  <option value="">
+                    {loadingCategories ? "Đang tải..." : "Chọn category"}
+                  </option>
 
-          </select>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
+              <label className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  name="status"
+                  checked={form.status}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-zinc-300"
+                  disabled={loading}
+                />
+                <span className="text-sm font-medium text-zinc-700">
+                  Kích hoạt subcategory
+                </span>
+              </label>
+            </div>
+
+            <div className="space-y-5">
+              <div className="rounded-3xl border border-zinc-200 bg-white p-5">
+                <p className="mb-3 text-sm font-semibold text-zinc-700">
+                  Thumbnail hiện tại
+                </p>
+
+                <div className="flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
+                  {currentThumbnail && !form.remove_thumbnail ? (
+                    <img
+                      src={`${API_ORIGIN}${currentThumbnail.file_path}`}
+                      alt="Current thumbnail"
+                      className="h-full max-h-[280px] w-full object-cover"
+                    />
+                  ) : (
+                    <div className="px-6 text-center text-sm text-zinc-400">
+                      Chưa có thumbnail hiện tại
+                    </div>
+                  )}
+                </div>
+
+                {currentThumbnail && !form.remove_thumbnail && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCurrentThumbnail}
+                    className="mt-4 rounded-xl border border-red-300 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                  >
+                    Xóa thumbnail hiện tại
+                  </button>
+                )}
+              </div>
+
+              <div className="rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 p-5">
+                <label className="mb-3 block text-sm font-semibold text-zinc-700">
+                  Chọn thumbnail mới
+                </label>
+
+                <input
+                  type="file"
+                  name="thumbnail"
+                  accept="image/*"
+                  onChange={handleChange}
+                  disabled={loading}
+                  className="block w-full text-sm text-zinc-600 file:mr-4 file:rounded-xl file:border-0 file:bg-blue-600 file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-blue-700 disabled:cursor-not-allowed"
+                />
+
+                <p className="mt-3 text-xs text-zinc-500">
+                  Nếu chọn ảnh mới, ảnh này sẽ thay cho thumbnail hiện tại.
+                </p>
+
+                {form.thumbnail && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveSelectedThumbnail}
+                    className="mt-4 rounded-xl border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100"
+                  >
+                    Xóa ảnh mới đã chọn
+                  </button>
+                )}
+              </div>
+
+              <div className="rounded-3xl border border-zinc-200 bg-white p-5">
+                <p className="mb-3 text-sm font-semibold text-zinc-700">
+                  Xem trước thumbnail mới
+                </p>
+
+                <div className="flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt="New thumbnail preview"
+                      className="h-full max-h-[280px] w-full object-cover"
+                    />
+                  ) : (
+                    <div className="px-6 text-center text-sm text-zinc-400">
+                      Chưa chọn thumbnail mới
+                    </div>
+                  )}
+                </div>
+
+                {form.thumbnail && (
+                  <div className="mt-3 text-sm text-zinc-600">
+                    <p>
+                      <span className="font-semibold">Tên file:</span>{" "}
+                      {form.thumbnail.name}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Dung lượng:</span>{" "}
+                      {(form.thumbnail.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 flex flex-wrap items-center gap-3 border-t border-zinc-200 pt-6">
+              <button
+                type="submit"
+                disabled={loading || submitting}
+                className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Đang cập nhật..." : "Lưu cập nhật"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/subcategory/list")}
+                className="rounded-2xl border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Quay lại danh sách
+              </button>
+            </div>
+          </form>
         </div>
-
-        <div className="flex gap-2">
-
-          <input
-            type="checkbox"
-            name="status"
-            checked={form.status}
-            onChange={handleChange}
-          />
-
-          <label>Active</label>
-
-        </div>
-
-        <button
-          type="submit"
-          className="bg-green-600 text-white px-4 py-2 rounded"
-        >
-          Update
-        </button>
-
-      </form>
-
+      </div>
     </div>
-
   );
-
 }

@@ -8,6 +8,7 @@ export default function AdminLayout({ setIsAuthenticated }) {
 
   const [logoutMessage, setLogoutMessage] = useState("");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -18,6 +19,15 @@ export default function AdminLayout({ setIsAuthenticated }) {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    function handleScroll() {
+      setShowScrollTop(window.scrollY > 200);
+    }
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   async function handleLogout() {
@@ -40,6 +50,13 @@ export default function AdminLayout({ setIsAuthenticated }) {
       setLogoutMessage("Lỗi kết nối server");
       console.error(error);
     }
+  }
+
+  function handleScrollToTop() {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   return (
@@ -99,21 +116,21 @@ export default function AdminLayout({ setIsAuthenticated }) {
               onClick={() => navigate("/user/list")}
               className="flex w-full items-center gap-3 rounded-xl bg-blue-500/20 px-4 py-3 text-left text-sm font-semibold text-blue-200 hover:bg-blue-500/30"
             >
-              List User
+              Quản lý nhân viên
             </button>
 
             <button
               onClick={() => navigate("/category/list")}
               className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-200 hover:bg-slate-800"
             >
-              Categories
+              Quản lý danh mục
             </button>
 
             <button
               onClick={() => navigate("/subcategory/list")}
               className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-200 hover:bg-slate-800"
             >
-              SubCategories
+              Quản lý danh mục con
             </button>
 
             {logoutMessage && (
@@ -131,6 +148,19 @@ export default function AdminLayout({ setIsAuthenticated }) {
         </main>
 
       </div>
+
+      {/* BUTTON SCROLL TO TOP */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={handleScrollToTop}
+          className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-sky-600 text-xl font-bold text-white shadow-lg transition hover:scale-105 hover:bg-sky-700"
+          aria-label="Quay về đầu trang"
+          title="Quay về đầu trang"
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 }

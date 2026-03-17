@@ -8,6 +8,7 @@ class SubCategory(db.Model):
     id = db.Column("id_subcategory", db.Integer, primary_key=True, autoincrement=True)
 
     name = db.Column(db.String(255), nullable=False)
+    slug = db.Column(db.String(255), unique=True, nullable=False)
     description = db.Column(db.Text)
 
     status = db.Column(db.Boolean, default=True)
@@ -21,6 +22,12 @@ class SubCategory(db.Model):
         nullable=False
     )
 
+    thumbnail_media_id = db.Column(
+        db.Integer,
+        db.ForeignKey("media.id_media", ondelete="SET NULL"),
+        nullable=True
+    )
+
     category = db.relationship(
         "Category",
         back_populates="subcategories"
@@ -30,4 +37,10 @@ class SubCategory(db.Model):
         "Post",
         back_populates="subcategory",
         cascade="all, delete"
+    )
+
+    thumbnail_media = db.relationship(
+        "Media",
+        foreign_keys=[thumbnail_media_id],
+        lazy="joined"
     )

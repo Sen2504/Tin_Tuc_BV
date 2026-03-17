@@ -42,3 +42,5 @@ dist/
 # Postman
 .postman/
 postman/
+
+/public/tinymce/

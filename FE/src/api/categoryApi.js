@@ -1,8 +1,18 @@
 const API_BASE = "http://localhost:5000/api";
 
-export async function getCategoriesApi() {
+export async function getCategoriesApi(options = {}) {
+  const params = new URLSearchParams();
+
+  if (options.includeInactive) {
+    params.set("include_inactive", "true");
+  }
+
+  const queryString = params.toString();
+
   try {
-    const res = await fetch(`${API_BASE}/categories`);
+    const res = await fetch(
+      `${API_BASE}/categories${queryString ? `?${queryString}` : ""}`
+    );
 
     const data = await res.json();
 
@@ -52,4 +62,21 @@ export async function updateCategoryApi(id, payload) {
   const data = await res.json();
 
   return { ok: res.ok, data };
+}
+
+export async function getCategorySubcategoriesBySlugApi(categorySlug) {
+  try {
+    const res = await fetch(`${API_BASE}/categories/${categorySlug}/subcategories`);
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch {
+    return {
+      ok: false,
+      data: { error: "Network error" },
+    };
+  }
 }

@@ -8,6 +8,7 @@ class Category(db.Model):
     id = db.Column("id_category", db.Integer, primary_key=True, autoincrement=True)
 
     name = db.Column(db.String(255), nullable=False)
+    slug = db.Column(db.String(255), unique=True, nullable=False)
     description = db.Column(db.Text)
 
     status = db.Column(db.Boolean, default=True)

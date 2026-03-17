@@ -13,6 +13,8 @@ import CategoryUpdatePage from "./pages/CategoryUpdatePage";
 import SubCategoryListPage from "./pages/SubCategoryListPage";
 import SubCategoryCreatePage from "./pages/SubCategoryCreatePage";
 import SubCategoryUpdatePage from "./pages/SubCategoryUpdatePage";
+import CreatePostPage from "./pages/CreatePostPage";
+import CategoryPage from "./pages/CategoryPage";
 
 export default function App() {
   return (
@@ -23,6 +25,7 @@ export default function App() {
           <Route path="/Homepage" element={<HomePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/:categorySlug" element={<CategoryPage />} />
         </Route>
         
         {/* Các trang có dùng AdminLayout */}
@@ -38,6 +41,9 @@ export default function App() {
           <Route path="/subcategory/list" element={<SubCategoryListPage />} />
           <Route path="/subcategory/create" element={<SubCategoryCreatePage />} />
           <Route path="/subcategory/update/:id" element={<SubCategoryUpdatePage />} />
+          
+          <Route path="/post/create" element={<CreatePostPage />} />
+
         </Route>
 
         {/* Trang login để riêng, thường không cần header/footer */}
