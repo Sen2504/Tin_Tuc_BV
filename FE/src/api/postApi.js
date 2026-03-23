@@ -84,12 +84,23 @@ export async function updatePostApi(postId, payload) {
 }
 
 // API dùng chung cho cả giao diện người dùng và quản trị
-export async function getPostsApi() {
+export async function getPostsApi(options = {}) {
+  const params = new URLSearchParams();
+
+  if (options.includeInactive) {
+    params.set("include_inactive", "true");
+  }
+
+  const queryString = params.toString();
+
   try {
-    const res = await fetch(`${API_BASE_URL}/api/posts`, {
-      method: "GET",
-      credentials: "include",
-    });
+    const res = await fetch(
+      `${API_BASE_URL}/api/posts${queryString ? `?${queryString}` : ""}`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
 
     const data = await res.json();
 

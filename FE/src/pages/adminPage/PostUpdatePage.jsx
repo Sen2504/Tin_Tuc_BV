@@ -150,7 +150,7 @@ export default function PostUpdatePage() {
       }
 
       const categoryList = categoryResult.data?.categories || [];
-      const post = postResult.data?.post;
+      const post = postResult.data;
 
       setCategories(categoryList);
       setPostMeta(post);

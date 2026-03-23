@@ -1,8 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { updateCategoryApi, getCategoryByIdApi } from "@/api/categoryApi";
 import { toSlugPreview } from "@/utils/slugPreview";
+import ToastStack from "@/components/ToastStack";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 export default function CategoryUpdatePage() {
   const navigate = useNavigate();
@@ -14,8 +29,24 @@ export default function CategoryUpdatePage() {
     status: true,
   });
 
-  const [message, setMessage] = useState("");
+  const [toasts, setToasts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   const slugPreview = useMemo(() => toSlugPreview(form.name), [form.name]);
 
@@ -25,12 +56,11 @@ export default function CategoryUpdatePage() {
 
   async function loadCategory() {
     setLoading(true);
-    setMessage("");
 
     const result = await getCategoryByIdApi(id);
 
     if (!result.ok) {
-      setMessage("Cannot load category");
+      showPopup("error", getBackendMessage(result.data, "Không thể tải danh mục"));
       setLoading(false);
       return;
     }
@@ -55,16 +85,18 @@ export default function CategoryUpdatePage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("");
 
     const result = await updateCategoryApi(id, form);
 
     if (!result.ok) {
-      setMessage(result.data?.error || "Update failed");
+      showPopup("error", getBackendMessage(result.data, "Cập nhật thất bại"));
       return;
     }
 
-    navigate("/category/list");
+    showPopup("success", getBackendMessage(result.data, "Danh mục đã được cập nhật thành công"));
+    setTimeout(() => {
+      navigate("/category/list");
+    }, 2000);
   }
 
   return (
@@ -82,12 +114,6 @@ export default function CategoryUpdatePage() {
           </p>
         </div>
       </div>
-
-      {message && (
-        <div className="relative mb-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {message}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="relative space-y-6">
         <div className="grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
@@ -209,6 +235,8 @@ export default function CategoryUpdatePage() {
           </button>
         </div>
       </form>
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </section>
   );
 }

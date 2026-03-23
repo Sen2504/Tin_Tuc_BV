@@ -127,3 +127,24 @@ export async function updateCategoryApi(id, payload) {
     };
   }
 }
+
+export async function deleteCategoryApi(id) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}

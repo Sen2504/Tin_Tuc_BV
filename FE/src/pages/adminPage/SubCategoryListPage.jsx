@@ -1,22 +1,62 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { getSubCategoriesApi, updateSubCategoryApi } from "@/api/subcategoryApi";
+import {
+  deleteSubCategoryApi,
+  getSubCategoriesApi,
+  updateSubCategoryApi,
+} from "@/api/subcategoryApi";
+import ToastStack from "@/components/ToastStack";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 export default function SubCategoryListPage() {
   const navigate = useNavigate();
 
   const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [parentFilter, setParentFilter] = useState("all");
   const [updatingIds, setUpdatingIds] = useState([]);
+  const [deletingIds, setDeletingIds] = useState([]);
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState(null);
   const [selectedNextStatus, setSelectedNextStatus] = useState(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingSubcategory, setDeletingSubcategory] = useState(null);
+
+  const [toasts, setToasts] = useState([]);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   useEffect(() => {
     loadSubCategories();
@@ -24,12 +64,11 @@ export default function SubCategoryListPage() {
 
   async function loadSubCategories() {
     setLoading(true);
-    setMessage("");
 
     const result = await getSubCategoriesApi();
 
     if (!result.ok) {
-      setMessage("Cannot load subcategories");
+      showPopup("error", getBackendMessage(result.data, "Cannot load subcategories"));
       setLoading(false);
       return;
     }
@@ -62,6 +101,16 @@ export default function SubCategoryListPage() {
     setSelectedNextStatus(null);
   }
 
+  function handleOpenDeleteModal(subcategory) {
+    setDeletingSubcategory(subcategory);
+    setDeleteModalOpen(true);
+  }
+
+  function handleCloseDeleteModal() {
+    setDeletingSubcategory(null);
+    setDeleteModalOpen(false);
+  }
+
   async function handleConfirmStatusChange() {
     if (!selectedSubcategory || selectedNextStatus === null) return;
 
@@ -70,7 +119,6 @@ export default function SubCategoryListPage() {
     const nextStatus = selectedNextStatus;
 
     setUpdatingIds((prev) => [...prev, subcategoryId]);
-    setMessage("");
 
     handleCloseConfirm();
 
@@ -92,7 +140,10 @@ export default function SubCategoryListPage() {
             : sub
         )
       );
-      setMessage(result.data?.error || "Không thể cập nhật trạng thái danh mục con");
+      showPopup(
+        "error",
+        getBackendMessage(result.data, "Không thể cập nhật trạng thái danh mục con")
+      );
       setUpdatingIds((prev) => prev.filter((id) => id !== subcategoryId));
       return;
     }
@@ -109,7 +160,39 @@ export default function SubCategoryListPage() {
       );
     }
 
+    showPopup(
+      "success",
+      getBackendMessage(result.data, "Cập nhật trạng thái danh mục con thành công")
+    );
+
     setUpdatingIds((prev) => prev.filter((id) => id !== subcategoryId));
+  }
+
+  async function handleConfirmDeleteSubcategory() {
+    if (!deletingSubcategory) return;
+
+    const subcategoryId = deletingSubcategory.id;
+
+    setDeletingIds((prev) => [...prev, subcategoryId]);
+    handleCloseDeleteModal();
+
+    const result = await deleteSubCategoryApi(subcategoryId);
+
+    if (!result.ok) {
+      showPopup(
+        "error",
+        getBackendMessage(result.data, "Xóa danh mục con thất bại")
+      );
+      setDeletingIds((prev) => prev.filter((id) => id !== subcategoryId));
+      return;
+    }
+
+    setSubcategories((prev) => prev.filter((sub) => sub.id !== subcategoryId));
+    showPopup(
+      "success",
+      getBackendMessage(result.data, "Xóa danh mục con thành công")
+    );
+    setDeletingIds((prev) => prev.filter((id) => id !== subcategoryId));
   }
 
   const parentCategoryOptions = useMemo(() => {
@@ -239,12 +322,6 @@ export default function SubCategoryListPage() {
           </div>
         </div>
 
-        {message && (
-          <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-            {message}
-          </div>
-        )}
-
         <div className="overflow-hidden rounded-[24px] border border-zinc-200">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-zinc-200">
@@ -257,9 +334,12 @@ export default function SubCategoryListPage() {
                     Danh mục cha
                   </th>
                   <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
+                    Số lượng bài viết
+                  </th>
+                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
                     Trạng thái
                   </th>
-                  <th className="w-[170px] px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
+                  <th className="w-[220px] px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
                     Hành động
                   </th>
                 </tr>
@@ -268,22 +348,22 @@ export default function SubCategoryListPage() {
               <tbody className="divide-y divide-zinc-100 bg-white">
                 {loading ? (
                   <tr>
-                    <td colSpan="4" className="px-5 py-14 text-center text-sm font-medium text-zinc-500">
+                    <td colSpan="5" className="px-5 py-14 text-center text-sm font-medium text-zinc-500">
                       Đang tải danh sách danh mục con...
                     </td>
                   </tr>
                 ) : filteredSubcategories.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="px-5 py-14 text-center text-sm font-medium text-zinc-500">
+                    <td colSpan="5" className="px-5 py-14 text-center text-sm font-medium text-zinc-500">
                       Không có danh mục con phù hợp với bộ lọc hiện tại.
                     </td>
                   </tr>
                 ) : (
-                  filteredSubcategories.map((sub) => (
-                    (() => {
-                      const isUpdating = updatingIds.includes(sub.id);
+                  filteredSubcategories.map((sub) => {
+                    const isUpdating = updatingIds.includes(sub.id);
+                    const isDeleting = deletingIds.includes(sub.id);
 
-                      return (
+                    return (
                     <tr key={sub.id} className="transition hover:bg-orange-50/40">
                       <td className="px-5 py-4 align-top">
                         <div className="flex items-start gap-4">
@@ -305,35 +385,54 @@ export default function SubCategoryListPage() {
                       </td>
 
                       <td className="px-5 py-4 align-top">
+                        <p className="text-sm font-bold text-zinc-800">{sub.posts_count ?? 0}</p>
+                      </td>
+
+                      <td className="px-5 py-4 align-top">
                         <select
                           value={sub.status ? "active" : "inactive"}
                           onChange={(event) =>
                             handleOpenConfirm(sub, event.target.value)
                           }
-                          disabled={isUpdating}
+                          disabled={isUpdating || isDeleting}
                           className={`w-[122px] rounded-xl border px-3 py-2 text-[12px] font-semibold outline-none transition ${
                             sub.status
                               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                               : "border-rose-200 bg-rose-50 text-rose-700"
-                          } ${isUpdating ? "cursor-not-allowed opacity-70" : "focus:border-orange-400"}`}
+                          } ${
+                            isUpdating || isDeleting
+                              ? "cursor-not-allowed opacity-70"
+                              : "focus:border-orange-400"
+                          }`}
                         >
                           <option value="active">Active</option>
                           <option value="inactive">Inactive</option>
                         </select>
                       </td>
 
-                      <td className="w-[170px] px-5 py-4 align-top text-left">
-                        <button
-                          onClick={() => navigate(`/subcategory/update/${sub.id}`)}
-                          className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100"
-                        >
-                          Chỉnh sửa
-                        </button>
+                      <td className="w-[220px] px-5 py-4 align-top text-left">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => navigate(`/subcategory/update/${sub.id}`)}
+                            disabled={isDeleting}
+                            className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            Sửa
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDeleteModal(sub)}
+                            disabled={isDeleting}
+                            className="inline-flex items-center justify-center rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isDeleting ? "Đang xóa..." : "Xóa"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                      );
-                    })()
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -382,14 +481,58 @@ export default function SubCategoryListPage() {
               <button
                 type="button"
                 onClick={handleConfirmStatusChange}
-                className="rounded-2xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-400"
+                disabled={selectedSubcategory && updatingIds.includes(selectedSubcategory.id)}
+                className="rounded-2xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Xác nhận
+                {selectedSubcategory && updatingIds.includes(selectedSubcategory.id)
+                  ? "Đang cập nhật..."
+                  : "Xác nhận"}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/45 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-black text-zinc-900">Xác nhận xóa danh mục con</h3>
+
+            <p className="mt-3 text-sm leading-6 text-zinc-600">
+              Bạn có chắc muốn xóa danh mục con{" "}
+              <span className="font-bold text-zinc-900">{deletingSubcategory?.name}</span>
+              {" "}không?
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-rose-600">
+              Thao tác này có thể ảnh hưởng dữ liệu bài viết liên quan.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                className="rounded-2xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:bg-zinc-100"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSubcategory}
+                disabled={deletingSubcategory && deletingIds.includes(deletingSubcategory.id)}
+                className="rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {deletingSubcategory && deletingIds.includes(deletingSubcategory.id)
+                  ? "Đang xóa..."
+                  : "Xác nhận xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </section>
   );
 }

@@ -2,45 +2,83 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 
 from app.services.post_service import PostService
+from marshmallow import ValidationError
+from app.schemas.post_schema import (
+    PostCreateSchema,
+    PostUpdateSchema,
+    PostResponseSchema,
+    PostPublicListItemSchema,
+    PostPublicDetailSchema,
+)
 
 post_bp = Blueprint("posts", __name__, url_prefix="/api/posts")
 
+post_create_schema = PostCreateSchema()
+post_update_schema = PostUpdateSchema()
 
-def to_bool(value, default=True):
-    if value is None:
-        return default
+post_response_schema = PostResponseSchema()
+posts_response_schema = PostResponseSchema(many=True)
+
+post_public_list_item_schema = PostPublicListItemSchema(many=True)
+post_public_detail_schema = PostPublicDetailSchema()
+
+
+def parse_bool(value):
+    if value is None or value == "":
+        return None
 
     if isinstance(value, bool):
         return value
 
     if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes", "on"}
+        value = value.strip().lower()
+        if value in {"true", "1", "yes", "on", "active"}:
+            return True
+        if value in {"false", "0", "no", "off", "inactive"}:
+            return False
 
-    return bool(value)
+    if isinstance(value, int):
+        return bool(value)
 
+    raise ValidationError("status phải là boolean hợp lệ")
+
+
+def parse_int(value, field_name="id"):
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, str):
+        value = value.strip()
+        if value.isdigit():
+            return int(value)
+
+    raise ValidationError(f"{field_name} phải là số nguyên")
 
 # 1. Các route của ADMIN
 # 1.1 Route để get all post của trang admin
 @post_bp.route("", methods=["GET"])
 @login_required
 def get_post():
-    data, error = PostService.get_post()
+    posts, error = PostService.get_post()
 
     if error:
         return jsonify({"error": error}), 400
 
-    return jsonify(data), 200
+    return jsonify(posts_response_schema.dump(posts)), 200
 
 
 @post_bp.route("/<int:post_id>", methods=["GET"])
 @login_required
 def get_post_by_id(post_id):
-    data, error = PostService.get_post_by_id(post_id)
+    post, error = PostService.get_post_by_id(post_id)
 
     if error:
         return jsonify({"error": error}), 404
 
-    return jsonify(data), 200
+    return jsonify(post_response_schema.dump(post)), 200
 
 
 @post_bp.route("", methods=["POST"])
@@ -48,32 +86,20 @@ def get_post_by_id(post_id):
 def create_post():
     data = request.get_json(silent=True) or {}
 
-    title = (data.get("title") or "").strip()
-    content = (data.get("content") or "").strip()
-    hashtag = (data.get("hashtag") or "").strip() or None
-    subcategory_id = data.get("subcategory_id")
-    status = to_bool(data.get("status"), True)
-
-    if not title:
-        return jsonify({"error": "title is required"}), 400
-
-    if not content:
-        return jsonify({"error": "content is required"}), 400
-
-    if not subcategory_id:
-        return jsonify({"error": "subcategory_id is required"}), 400
-
     try:
-        subcategory_id = int(subcategory_id)
-    except (TypeError, ValueError):
-        return jsonify({"error": "subcategory_id must be integer"}), 400
+        validated_data = post_create_schema.load(data)
+    except ValidationError as err:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": err.messages
+        }), 400
 
     post, error = PostService.create_post(
-        title=title,
-        content=content,
-        hashtag=hashtag,
-        status=status,
-        subcategory_id=subcategory_id,
+        title=validated_data.get("title"),
+        content=validated_data.get("content"),
+        hashtag=validated_data.get("hashtag"),
+        status=parse_bool(validated_data.get("status", True)),
+        subcategory_id=parse_int(validated_data.get("subcategory_id"), "subcategory_id"),
         author_id=current_user.id,
     )
 
@@ -82,18 +108,7 @@ def create_post():
 
     return jsonify({
         "message": "Tạo bài viết thành công",
-        "post": {
-            "id": post.id,
-            "title": post.title,
-            "slug": post.slug,
-            "content": post.content,
-            "status": post.status,
-            "hashtag": post.hashtag,
-            "subcategory_id": post.subcategory_id,
-            "user_id": post.user_id,
-            "created_at": post.create_at.isoformat() if post.create_at else None,
-            "updated_at": post.update_at.isoformat() if post.update_at else None,
-        }
+        "post": post_response_schema.dump(post)
     }), 201
 
 
@@ -102,24 +117,21 @@ def create_post():
 def update_post(post_id):
     data = request.get_json(silent=True) or {}
 
-    subcategory_id = data.get("subcategory_id")
-    if subcategory_id is not None:
-        try:
-            subcategory_id = int(subcategory_id)
-        except (TypeError, ValueError):
-            return jsonify({"error": "subcategory_id must be integer"}), 400
-
-    status = data.get("status")
-    if status is not None:
-        status = to_bool(status, True)
+    try:
+        validated_data = post_update_schema.load(data)
+    except ValidationError as err:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": err.messages
+        }), 400
 
     post, error = PostService.update_post(
         post_id=post_id,
-        title=data.get("title"),
-        content=data.get("content"),
-        hashtag=data.get("hashtag"),
-        status=status,
-        subcategory_id=subcategory_id,
+        title=validated_data.get("title"),
+        content=validated_data.get("content"),
+        hashtag=validated_data.get("hashtag"),
+        status=parse_bool(validated_data["status"]) if "status" in validated_data else None,
+        subcategory_id=parse_int(validated_data["subcategory_id"], "subcategory_id") if "subcategory_id" in validated_data else None,
     )
 
     if error:
@@ -128,32 +140,7 @@ def update_post(post_id):
 
     return jsonify({
         "message": "post updated",
-        "post": {
-            "id": post.id,
-            "title": post.title,
-            "slug": post.slug,
-            "content": post.content,
-            "status": post.status,
-            "hashtag": post.hashtag,
-            "subcategory_id": post.subcategory_id,
-            "user_id": post.user_id,
-            "created_at": post.create_at.isoformat() if post.create_at else None,
-            "updated_at": post.update_at.isoformat() if post.update_at else None,
-            "author": {
-                "id": post.author.id if post.author else None,
-                "username": post.author.username if post.author else None,
-            },
-            "category": {
-                "id": post.subcategory.category.id if post.subcategory and post.subcategory.category else None,
-                "name": post.subcategory.category.name if post.subcategory and post.subcategory.category else None,
-                "slug": post.subcategory.category.slug if post.subcategory and post.subcategory.category else None,
-            },
-            "subcategory": {
-                "id": post.subcategory.id if post.subcategory else None,
-                "name": post.subcategory.name if post.subcategory else None,
-                "slug": post.subcategory.slug if post.subcategory else None,
-            },
-        }
+        "post": post_response_schema.dump(post)
     }), 200
 
 

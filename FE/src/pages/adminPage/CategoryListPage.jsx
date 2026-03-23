@@ -1,6 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCategoriesApi, updateCategoryApi } from "@/api/categoryApi";
+import {
+  getCategoriesApi,
+  updateCategoryApi,
+  deleteCategoryApi,
+} from "@/api/categoryApi";
+import ToastStack from "@/components/ToastStack";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 export default function CategoryListPage() {
   const navigate = useNavigate();
@@ -15,9 +34,32 @@ export default function CategoryListPage() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedNextStatus, setSelectedNextStatus] = useState(null);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState(null);
+  const [deletingIds, setDeletingIds] = useState([]);
+
   const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
   const [selectedDescription, setSelectedDescription] = useState("");
   const [selectedDescriptionTitle, setSelectedDescriptionTitle] = useState("");
+
+  const [toasts, setToasts] = useState([]);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   async function loadCategories() {
     setLoading(true);
@@ -26,7 +68,7 @@ export default function CategoryListPage() {
     const result = await getCategoriesApi({ includeInactive: true });
 
     if (!result.ok) {
-      setMessage("Cannot load categories");
+      setMessage(getBackendMessage(result.data, "Cannot load categories"));
       setLoading(false);
       return;
     }
@@ -52,6 +94,16 @@ export default function CategoryListPage() {
     setConfirmModalOpen(false);
     setSelectedCategory(null);
     setSelectedNextStatus(null);
+  }
+
+  function handleOpenDeleteModal(category) {
+    setDeletingCategory(category);
+    setDeleteModalOpen(true);
+  }
+
+  function handleCloseDeleteModal() {
+    setDeleteModalOpen(false);
+    setDeletingCategory(null);
   }
 
   function handleOpenDescription(categoryName, description) {
@@ -96,7 +148,11 @@ export default function CategoryListPage() {
             : category
         )
       );
-      setMessage(result.data?.error || "Cannot update category status");
+
+      showPopup(
+        "error",
+        getBackendMessage(result.data, "Cannot update category status")
+      );
       setUpdatingIds((prev) => prev.filter((id) => id !== categoryId));
       return;
     }
@@ -113,7 +169,43 @@ export default function CategoryListPage() {
       );
     }
 
+    showPopup(
+      "success",
+      getBackendMessage(result.data, "Cập nhật trạng thái thành công")
+    );
+
     setUpdatingIds((prev) => prev.filter((id) => id !== categoryId));
+  }
+
+  async function handleConfirmDeleteCategory() {
+    if (!deletingCategory) return;
+
+    const categoryId = deletingCategory.id;
+
+    setDeletingIds((prev) => [...prev, categoryId]);
+    setMessage("");
+
+    handleCloseDeleteModal();
+
+    const result = await deleteCategoryApi(categoryId);
+
+    if (!result.ok) {
+      showPopup(
+        "error",
+        getBackendMessage(result.data, "Xóa category thất bại")
+      );
+      setDeletingIds((prev) => prev.filter((id) => id !== categoryId));
+      return;
+    }
+
+    setCategories((prev) => prev.filter((category) => category.id !== categoryId));
+
+    showPopup(
+      "success",
+      getBackendMessage(result.data, "Xóa category thành công")
+    );
+
+    setDeletingIds((prev) => prev.filter((id) => id !== categoryId));
   }
 
   useEffect(() => {
@@ -143,6 +235,9 @@ export default function CategoryListPage() {
 
   const isConfirming =
     selectedCategory && updatingIds.includes(selectedCategory.id);
+
+  const isDeleting =
+    deletingCategory && deletingIds.includes(deletingCategory.id);
 
   return (
     <>
@@ -228,16 +323,22 @@ export default function CategoryListPage() {
               <table className="min-w-full table-fixed divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="w-[28%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="w-[22%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Danh mục
                     </th>
-                    <th className="w-[38%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="w-[18%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Mô tả
                     </th>
-                    <th className="w-[16%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="w-[12%] px-4 py-3 text-center text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                      <span className="block whitespace-normal leading-4">Số lượng danh mục con</span>
+                    </th>
+                    <th className="w-[12%] px-4 py-3 text-center text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                      <span className="block whitespace-normal leading-4">Số lượng bài viết</span>
+                    </th>
+                    <th className="w-[12%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Trạng thái
                     </th>
-                    <th className="w-[18%] px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                    <th className="w-[14%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Hành động
                     </th>
                   </tr>
@@ -246,21 +347,29 @@ export default function CategoryListPage() {
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {loading ? (
                     <tr>
-                      <td colSpan="4" className="px-5 py-14 text-center text-sm font-medium text-slate-500">
+                      <td colSpan="6" className="px-5 py-14 text-center text-sm font-medium text-slate-500">
                         Đang tải danh mục...
                       </td>
                     </tr>
                   ) : filteredCategories.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-5 py-14 text-center text-sm font-medium text-slate-500">
+                      <td colSpan="6" className="px-5 py-14 text-center text-sm font-medium text-slate-500">
                         Không tìm thấy danh mục nào phù hợp với bộ lọc hiện tại.
                       </td>
                     </tr>
                   ) : (
                     filteredCategories.map((category) => {
                       const isUpdating = updatingIds.includes(category.id);
+                      const isDeletingRow = deletingIds.includes(category.id);
                       const descriptionText = category.description || "Chưa có mô tả.";
-                      const isLongDescription = descriptionText.length > 90;
+                      const subcategoriesCount = Number.isFinite(category.subcategories_count)
+                        ? category.subcategories_count
+                        : Array.isArray(category.subcategories)
+                          ? category.subcategories.length
+                          : 0;
+                      const postsCount = Number.isFinite(category.posts_count)
+                        ? category.posts_count
+                        : 0;
 
                       return (
                         <tr key={category.id} className="transition hover:bg-slate-50/80">
@@ -285,18 +394,14 @@ export default function CategoryListPage() {
                             >
                               {descriptionText}
                             </p>
+                          </td>
 
-                            {/* {isLongDescription && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleOpenDescription(category.name, descriptionText)
-                                }
-                                className="mt-1 text-[11px] font-semibold text-cyan-700 transition hover:text-cyan-600"
-                              >
-                                Xem
-                              </button>
-                            )} */}
+                          <td className="px-4 py-3 text-center align-top">
+                            <p className="text-sm font-bold text-slate-800">{subcategoriesCount}</p>
+                          </td>
+
+                          <td className="px-4 py-3 text-center align-top">
+                            <p className="text-sm font-bold text-slate-800">{postsCount}</p>
                           </td>
 
                           <td className="px-4 py-3 align-top">
@@ -306,12 +411,16 @@ export default function CategoryListPage() {
                                 onChange={(event) =>
                                   handleOpenConfirm(category.id, event.target.value)
                                 }
-                                disabled={isUpdating}
+                                disabled={isUpdating || isDeletingRow}
                                 className={`w-[122px] rounded-xl border px-3 py-2 text-[12px] font-semibold outline-none transition ${
                                   category.status
                                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                                     : "border-amber-200 bg-amber-50 text-amber-700"
-                                } ${isUpdating ? "cursor-not-allowed opacity-70" : "focus:border-cyan-400"}`}
+                                } ${
+                                  isUpdating || isDeletingRow
+                                    ? "cursor-not-allowed opacity-70"
+                                    : "focus:border-cyan-400"
+                                }`}
                               >
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
@@ -319,13 +428,25 @@ export default function CategoryListPage() {
                             </div>
                           </td>
 
-                          <td className="px-4 py-3 align-top text-right">
-                            <button
-                              onClick={() => navigate(`/category/update/${category.id}`)}
-                              className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-                            >
-                              Chỉnh sửa
-                            </button>
+                          <td className="px-4 py-3 align-top text-left">
+                            <div className="flex justify-start gap-2">
+                              <button
+                                onClick={() => navigate(`/category/update/${category.id}`)}
+                                disabled={isDeletingRow}
+                                className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
+                              >
+                                Sửa
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleOpenDeleteModal(category)}
+                                disabled={isDeletingRow}
+                                className="inline-flex items-center justify-center rounded-xl bg-red-500 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-70"
+                              >
+                                {isDeletingRow ? "Đang xóa..." : "Xóa"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -408,6 +529,49 @@ export default function CategoryListPage() {
           </div>
         </div>
       )}
+
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-black text-slate-900">
+              Xác nhận xóa danh mục
+            </h3>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Bạn có chắc muốn xóa danh mục{" "}
+              <span className="font-bold text-slate-900">
+                {deletingCategory?.name}
+              </span>{" "}
+              không?
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-red-600">
+              Thao tác này có thể làm mất dữ liệu liên quan nếu backend đang xóa cứng.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCloseDeleteModal}
+                className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDeleteCategory}
+                disabled={isDeleting}
+                className="rounded-2xl bg-red-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isDeleting ? "Đang xóa..." : "Xác nhận xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </>
   );
 }

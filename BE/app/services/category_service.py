@@ -3,6 +3,23 @@ from app.models.category import Category
 from app.utils.slug import generate_unique_slug
 
 
+def normalize_bool(value):
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        value = value.strip().lower()
+        if value in {"true", "1", "yes", "on"}:
+            return True
+        if value in {"false", "0", "no", "off"}:
+            return False
+
+    if isinstance(value, int):
+        return bool(value)
+
+    return value
+
+
 class CategoryService:
 
     @staticmethod
@@ -10,19 +27,19 @@ class CategoryService:
         normalized_name = (name or "").strip()
 
         if not normalized_name:
-            return None, "name is required"
+            return None, "Tên danh mục là bắt buộc"
 
         existing = Category.query.filter_by(name=normalized_name).first()
         if existing:
-            return None, "category already exists"
+            return None, "Danh mục đã tồn tại"
 
         slug = generate_unique_slug(Category, normalized_name)
 
         category = Category(
             name=normalized_name,
             slug=slug,
-            description=description,
-            status=status
+            description=description.strip() if isinstance(description, str) else description,
+            status=normalize_bool(status)
         )
 
         db.session.add(category)
@@ -35,12 +52,13 @@ class CategoryService:
         category = Category.query.get(category_id)
 
         if not category:
-            return None, "category not found"
+            return None, "Danh mục không tồn tại"
 
-        next_name = category.name
-
-        if name is not None and name.strip():
+        if name is not None:
             next_name = name.strip()
+
+            if not next_name:
+                return None, "Tên danh mục là bắt buộc"
 
             duplicated = Category.query.filter(
                 Category.name == next_name,
@@ -48,7 +66,7 @@ class CategoryService:
             ).first()
 
             if duplicated:
-                return None, "category already exists"
+                return None, "Danh mục đã tồn tại"
 
             category.name = next_name
             category.slug = generate_unique_slug(
@@ -58,14 +76,29 @@ class CategoryService:
             )
 
         if description is not None:
-            category.description = description
+            category.description = description.strip() if isinstance(description, str) else description
 
         if status is not None:
-            category.status = status
+            category.status = normalize_bool(status)
 
         db.session.commit()
 
         return category, None
+    
+    @staticmethod
+    def delete_category(category_id):
+        category = Category.query.get(category_id)
+
+        if not category:
+            return False, "Danh mục không tồn tại"
+
+        try:
+            db.session.delete(category)
+            db.session.commit()
+            return True, None
+        except Exception as e:
+            db.session.rollback()
+            return False, str(e)
 
     @staticmethod
     def get_categories():

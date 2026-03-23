@@ -273,38 +273,7 @@ class PostService:
             .all()
         )
 
-        result = {
-            "posts": [
-                {
-                    "id": post.id,
-                    "title": post.title,
-                    "slug": post.slug,
-                    "content": post.content,
-                    "excerpt": strip_html(post.content)[:180],
-                    "status": post.status,
-                    "hashtag": post.hashtag,
-                    "create_at": post.create_at.isoformat() if post.create_at else None,
-                    "update_at": post.update_at.isoformat() if post.update_at else None,
-                    "author": {
-                        "id": post.author.id if post.author else None,
-                        "username": post.author.username if post.author else None,
-                    },
-                    "category": {
-                        "id": post.subcategory.category.id if post.subcategory and post.subcategory.category else None,
-                        "name": post.subcategory.category.name if post.subcategory and post.subcategory.category else None,
-                        "slug": post.subcategory.category.slug if post.subcategory and post.subcategory.category else None,
-                    },
-                    "subcategory": {
-                        "id": post.subcategory.id if post.subcategory else None,
-                        "name": post.subcategory.name if post.subcategory else None,
-                        "slug": post.subcategory.slug if post.subcategory else None,
-                    },
-                }
-                for post in posts
-            ]
-        }
-
-        return result, None
+        return posts, None
 
     @staticmethod
     def update_post(post_id, title=None, content=None, hashtag=None, status=None, subcategory_id=None):
@@ -424,33 +393,4 @@ class PostService:
         if not post:
             return None, "post not found"
 
-        result = {
-            "post": {
-                "id": post.id,
-                "title": post.title,
-                "slug": post.slug,
-                "content": post.content,
-                "status": post.status,
-                "hashtag": post.hashtag,
-                "subcategory_id": post.subcategory_id,
-                "user_id": post.user_id,
-                "create_at": post.create_at.isoformat() if post.create_at else None,
-                "update_at": post.update_at.isoformat() if post.update_at else None,
-                "author": {
-                    "id": post.author.id if post.author else None,
-                    "username": post.author.username if post.author else None,
-                },
-                "category": {
-                    "id": post.subcategory.category.id if post.subcategory and post.subcategory.category else None,
-                    "name": post.subcategory.category.name if post.subcategory and post.subcategory.category else None,
-                    "slug": post.subcategory.category.slug if post.subcategory and post.subcategory.category else None,
-                },
-                "subcategory": {
-                    "id": post.subcategory.id if post.subcategory else None,
-                    "name": post.subcategory.name if post.subcategory else None,
-                    "slug": post.subcategory.slug if post.subcategory else None,
-                },
-            }
-        }
-
-        return result, None
+        return post, None

@@ -1,7 +1,22 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createCategoryApi } from "@/api/categoryApi";
 import { toSlugPreview } from "@/utils/slugPreview";
+import ToastStack from "@/components/ToastStack";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 export default function CategoryCreatePage() {
   const navigate = useNavigate();
@@ -12,7 +27,23 @@ export default function CategoryCreatePage() {
     status: true,
   });
 
-  const [message, setMessage] = useState("");
+  const [toasts, setToasts] = useState([]);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   const slugPreview = useMemo(() => toSlugPreview(form.name), [form.name]);
 
@@ -31,11 +62,15 @@ export default function CategoryCreatePage() {
     const result = await createCategoryApi(form);
 
     if (!result.ok) {
-      setMessage(result.data?.error || "Create failed");
+      showPopup("error", getBackendMessage(result.data, "Tạo danh mục thất bại"));
       return;
     }
 
-    navigate("/category/list");
+    showPopup("success", getBackendMessage(result.data, "Danh mục đã được tạo thành công"));
+
+    setTimeout(() => {
+      navigate("/category/list");
+    }, 2000);
   }
 
   return (
@@ -53,12 +88,6 @@ export default function CategoryCreatePage() {
           </p>
         </div>
       </div>
-
-      {message && (
-        <div className="relative mb-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {message}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="relative space-y-6">
         <div className="grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
@@ -176,6 +205,8 @@ export default function CategoryCreatePage() {
           </button>
         </div>
       </form>
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </section>
   );
 }

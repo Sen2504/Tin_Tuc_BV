@@ -124,3 +124,24 @@ export async function updateSubCategoryApi(id, form) {
     };
   }
 }
+
+export async function deleteSubCategoryApi(id) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/subcategories/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}

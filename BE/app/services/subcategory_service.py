@@ -23,7 +23,7 @@ class SubCategoryService:
         extension = os.path.splitext(original_name)[1].lower().replace(".", "")
 
         if extension not in SubCategoryService.ALLOWED_IMAGE_EXTENSIONS:
-            return None, "thumbnail must be jpg, jpeg, png, webp, or gif"
+            return None, "Thumbnail phải là jpg, jpeg, png, webp, or gif"
 
         upload_root = current_app.config.get(
             "UPLOAD_FOLDER",
@@ -57,12 +57,12 @@ class SubCategoryService:
         category = Category.query.get(category_id)
 
         if not category:
-            return None, "category not found"
+            return None, "Danh mục không tìm thấy"
 
         normalized_name = (name or "").strip()
 
         if not normalized_name:
-            return None, "name is required"
+            return None, "Tên danh mục con là bắt buộc"
 
         existing = SubCategory.query.filter_by(
             name=normalized_name,
@@ -70,7 +70,7 @@ class SubCategoryService:
         ).first()
 
         if existing:
-            return None, "subcategory already exists"
+            return None, "Danh mục con đã tồn tại"
 
         thumbnail_media = None
         if thumbnail_file:
@@ -110,7 +110,7 @@ class SubCategoryService:
         subcategory = SubCategory.query.get(subcategory_id)
 
         if not subcategory:
-            return None, "subcategory not found"
+            return None, "Danh mục con không tìm thấy"
 
         next_name = subcategory.name
         next_category_id = subcategory.category_id
@@ -121,7 +121,7 @@ class SubCategoryService:
         if category_id is not None:
             category = Category.query.get(category_id)
             if not category:
-                return None, "category not found"
+                return None, "Danh mục không tìm thấy"
             next_category_id = category_id
 
         duplicated = SubCategory.query.filter(
@@ -131,7 +131,7 @@ class SubCategoryService:
         ).first()
 
         if duplicated:
-            return None, "subcategory already exists"
+            return None, "Danh mục con đã tồn tại"
 
         if name is not None and name.strip():
             subcategory.name = next_name
@@ -178,3 +178,18 @@ class SubCategoryService:
     @staticmethod
     def get_subcategory_by_slug(slug):
         return SubCategory.query.filter_by(slug=slug, status=True).first()
+
+    @staticmethod
+    def delete_subcategory(subcategory_id):
+        subcategory = SubCategory.query.get(subcategory_id)
+
+        if not subcategory:
+            return False, "Danh mục con không tìm thấy"
+
+        try:
+            db.session.delete(subcategory)
+            db.session.commit()
+            return True, None
+        except Exception as e:
+            db.session.rollback()
+            return False, str(e)

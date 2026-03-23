@@ -43,7 +43,7 @@ export default function PostListPage() {
       return;
     }
 
-    setPosts(result.data.posts || []);
+    setPosts(Array.isArray(result.data) ? result.data : []);
     setLoading(false);
   }
 
