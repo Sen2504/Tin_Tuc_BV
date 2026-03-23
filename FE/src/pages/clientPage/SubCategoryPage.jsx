@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getPostsBySubcategorySlugApi } from "../api/postApi";
-import { getCategorySubcategoriesBySlugApi } from "../api/categoryApi";
-import CategorySidebar from "../components/CategorySidebar";
+import { getPostsBySubcategorySlugApi } from "@/api/postApi";
+import { getCategorySubcategoriesBySlugApi } from "@/api/categoryApi";
+import CategorySidebar from "@/components/CategorySidebar";
 
 export default function SubCategoryPage() {
   const { categorySlug, subcategorySlug } = useParams();

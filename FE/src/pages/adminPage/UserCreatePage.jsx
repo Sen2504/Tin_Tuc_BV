@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createUserApi } from "../api/userApi";
+import { createUserApi } from "@/api/userApi";
 
 export default function CreateUserPage() {
 

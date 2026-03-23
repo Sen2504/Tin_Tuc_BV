@@ -1,7 +1,7 @@
-const API_BASE = "http://localhost:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export async function createUserApi(payload) {
-  const res = await fetch(`${API_BASE}/users`, {
+  const res = await fetch(`${API_BASE_URL}/api/users`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -15,7 +15,7 @@ export async function createUserApi(payload) {
 }
 
 export async function updateUserApi(userId, payload) {
-  const res = await fetch(`${API_BASE}/users/${userId}`, {
+  const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -29,7 +29,7 @@ export async function updateUserApi(userId, payload) {
 }
 
 export async function getUsersApi() {
-  const res = await fetch(`${API_BASE}/users`, {
+  const res = await fetch(`${API_BASE_URL}/api/users`, {
     method: "GET",
     credentials: "include",
   });

@@ -1,5 +1,5 @@
-const API_BASE = "http://localhost:5000/api";
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// API PUBLIC ra giao diện 
 export async function getCategoriesApi(options = {}) {
   const params = new URLSearchParams();
 
@@ -11,7 +11,11 @@ export async function getCategoriesApi(options = {}) {
 
   try {
     const res = await fetch(
-      `${API_BASE}/categories${queryString ? `?${queryString}` : ""}`
+      `${API_BASE_URL}/api/categories${queryString ? `?${queryString}` : ""}`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
     );
 
     const data = await res.json();
@@ -29,54 +33,97 @@ export async function getCategoriesApi(options = {}) {
 }
 
 export async function getCategoryByIdApi(id) {
-
-  const res = await fetch(`http://localhost:5000/api/categories/${id}`);
-
-  const data = await res.json();
-
-  return {
-    ok: res.ok,
-    data
-  };
-}
-
-export async function createCategoryApi(payload) {
-  const res = await fetch(`${API_BASE}/categories`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await res.json();
-
-  return { ok: res.ok, data };
-}
-
-export async function updateCategoryApi(id, payload) {
-  const res = await fetch(`${API_BASE}/categories/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await res.json();
-
-  return { ok: res.ok, data };
-}
-
-export async function getCategorySubcategoriesBySlugApi(categorySlug) {
   try {
-    const res = await fetch(`${API_BASE}/categories/${categorySlug}/subcategories`);
+    const res = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+      method: "GET",
+      credentials: "include",
+    });
+
     const data = await res.json();
 
     return {
       ok: res.ok,
       data,
     };
-  } catch {
+  } catch (error) {
     return {
       ok: false,
-      data: { error: "Network error" },
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+export async function getCategorySubcategoriesBySlugApi(categorySlug) {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/categories/${categorySlug}/subcategories`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+// API PRIVATE ra giao diện quản trị
+export async function createCategoryApi(payload) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/categories`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+export async function updateCategoryApi(id, payload) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
     };
   }
 }

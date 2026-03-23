@@ -1,22 +1,24 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "./layouts/MainLayout";
-import HomePage from "./pages/HomePage";
+import HomePage from "./pages/clientPage/HomePage";
 import LoginPage from "./pages/LoginPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminLayout from "./layouts/AdminLayout";
-import UserListPage from "./pages/UserListPage";
-import CreateUserPage from "./pages/CreateUserPage";
-import CategoryListPage from "./pages/CategoryListPage";
-import CategoryCreatePage from "./pages/CategoryCreatePage";
-import CategoryUpdatePage from "./pages/CategoryUpdatePage";
-import SubCategoryListPage from "./pages/SubCategoryListPage";
-import SubCategoryCreatePage from "./pages/SubCategoryCreatePage";
-import SubCategoryUpdatePage from "./pages/SubCategoryUpdatePage";
-import CreatePostPage from "./pages/CreatePostPage";
-import CategoryPage from "./pages/CategoryPage";
-import SubCategoryPage from "./pages/SubCategoryPage";
-import PostPage from "./pages/PostPage";
+import UserListPage from "./pages/adminPage/UserListPage";
+import UserCreatePage from "./pages/adminPage/UserCreatePage";
+import CategoryListPage from "./pages/adminPage/CategoryListPage";
+import CategoryCreatePage from "./pages/adminPage/CategoryCreatePage";
+import CategoryUpdatePage from "./pages/adminPage/CategoryUpdatePage";
+import SubCategoryListPage from "./pages/adminPage/SubCategoryListPage";
+import SubCategoryCreatePage from "./pages/adminPage/SubCategoryCreatePage";
+import SubCategoryUpdatePage from "./pages/adminPage/SubCategoryUpdatePage";
+import CreatePostPage from "./pages/adminPage/PostCreatePage";
+import CategoryPage from "./pages/clientPage/CategoryPage";
+import SubCategoryPage from "./pages/clientPage/SubCategoryPage";
+import PostPage from "./pages/clientPage/PostPage";
+import PostListPage from "./pages/adminPage/PostListPage";
+import PostUpdatePage from "./pages/adminPage/PostUpdatePage";
 
 export default function App() {
   return (
@@ -24,6 +26,7 @@ export default function App() {
       <Routes>
         {/* Các trang có dùng MainLayout */}
         <Route element={<MainLayout />}>
+          <Route path="/" element={<Navigate to="/Homepage" />} />
           <Route path="/Homepage" element={<HomePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -36,7 +39,7 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route path="/dashboard" element={<div />} />
           <Route path="/user/list" element={<UserListPage />} />
-          <Route path="/user/create" element={<CreateUserPage />} />
+          <Route path="/user/create" element={<UserCreatePage />} />
 
           <Route path="/category/list" element={<CategoryListPage />} />
           <Route path="/category/create" element={<CategoryCreatePage />} />
@@ -47,6 +50,8 @@ export default function App() {
           <Route path="/subcategory/update/:id" element={<SubCategoryUpdatePage />} />
           
           <Route path="/post/create" element={<CreatePostPage />} />
+          <Route path="/post/list" element={<PostListPage />} />
+          <Route path="/post/update/:id" element={<PostUpdatePage />} />
 
         </Route>
 

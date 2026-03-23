@@ -1,11 +1,10 @@
 from flask import Blueprint, request, jsonify
+from flask_login import login_required
 from app.services.subcategory_service import SubCategoryService
 
 
 subcategory_bp = Blueprint(
-    "subcategories",
-    __name__,
-    url_prefix="/api/subcategories"
+    "subcategories", __name__, url_prefix="/api/subcategories"
 )
 
 
@@ -48,7 +47,33 @@ def serialize_subcategory(subcategory):
     }
 
 
+# Các route của ADMIN
+@subcategory_bp.route("", methods=["GET"])
+@login_required
+def get_subcategories():
+    subcategories = SubCategoryService.get_subcategories()
+
+    return jsonify({
+        "subcategories": [
+            serialize_subcategory(s)
+            for s in subcategories
+        ]
+    })
+
+
+@subcategory_bp.route("/<int:subcategory_id>", methods=["GET"])
+@login_required
+def get_subcategory(subcategory_id):
+    subcategory = SubCategoryService.get_subcategory(subcategory_id)
+
+    if not subcategory:
+        return jsonify({"error": "subcategory not found"}), 404
+
+    return jsonify(serialize_subcategory(subcategory))
+
+
 @subcategory_bp.route("", methods=["POST"])
+@login_required
 def create_subcategory():
     data = request.form
     thumbnail_file = request.files.get("thumbnail")
@@ -87,6 +112,7 @@ def create_subcategory():
 
 
 @subcategory_bp.route("/<int:subcategory_id>", methods=["PUT"])
+@login_required
 def update_subcategory(subcategory_id):
     data = request.form if request.form else (request.get_json(silent=True) or {})
     thumbnail_file = request.files.get("thumbnail")
@@ -120,25 +146,3 @@ def update_subcategory(subcategory_id):
         "message": "subcategory updated",
         "subcategory": serialize_subcategory(subcategory)
     })
-
-
-@subcategory_bp.route("", methods=["GET"])
-def get_subcategories():
-    subcategories = SubCategoryService.get_subcategories()
-
-    return jsonify({
-        "subcategories": [
-            serialize_subcategory(s)
-            for s in subcategories
-        ]
-    })
-
-
-@subcategory_bp.route("/<int:subcategory_id>", methods=["GET"])
-def get_subcategory(subcategory_id):
-    subcategory = SubCategoryService.get_subcategory(subcategory_id)
-
-    if not subcategory:
-        return jsonify({"error": "subcategory not found"}), 404
-
-    return jsonify(serialize_subcategory(subcategory))

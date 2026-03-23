@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getCategorySubcategoriesBySlugApi } from "../api/categoryApi";
+import { getCategorySubcategoriesBySlugApi } from "@/api/categoryApi";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 

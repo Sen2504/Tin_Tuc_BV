@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getUsersApi, updateUserApi } from "../api/userApi";
+import { getUsersApi, updateUserApi } from "@/api/userApi";
 import { useNavigate } from "react-router-dom";
 
 export default function UserListPage() {

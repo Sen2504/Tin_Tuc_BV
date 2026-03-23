@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getPostsApi, updatePostApi } from "../api/postApi";
+import { getPostsApi, getPostByIdApi, updatePostApi } from "@/api/postApi";
 
 function formatDate(value) {
   if (!value) return "Chưa có dữ liệu";
 
-  try {
-    return new Date(value).toLocaleString("vi-VN");
-  } catch {
-    return value;
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Chưa có dữ liệu";
   }
+
+  return date.toLocaleString("vi-VN");
 }
 
 export default function PostListPage() {
@@ -19,12 +21,15 @@ export default function PostListPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [subcategoryFilter, setSubcategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [updatingIds, setUpdatingIds] = useState([]);
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [selectedNextStatus, setSelectedNextStatus] = useState(null);
+  const [openingEditId, setOpeningEditId] = useState(null);
 
   async function loadPosts() {
     setLoading(true);
@@ -41,6 +46,10 @@ export default function PostListPage() {
     setPosts(result.data.posts || []);
     setLoading(false);
   }
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
 
   function handleOpenConfirm(postId, nextValue) {
     const nextStatus = nextValue === "active";
@@ -112,9 +121,69 @@ export default function PostListPage() {
     setUpdatingIds((prev) => prev.filter((id) => id !== postId));
   }
 
-  useEffect(() => {
-    loadPosts();
-  }, []);
+  async function handleEdit(post) {
+    setOpeningEditId(post.id);
+    setMessage("");
+
+    const result = await getPostByIdApi(post.id);
+
+    if (!result.ok) {
+      setMessage(result.data?.error || "Không lấy được chi tiết bài viết");
+      setOpeningEditId(null);
+      return;
+    }
+
+    navigate(`/post/update/${post.id}`, {
+      state: {
+        post: result.data?.post || null,
+      },
+    });
+
+    setOpeningEditId(null);
+  }
+
+  function handleClearFilters() {
+    setCategoryFilter("all");
+    setSubcategoryFilter("all");
+    setStatusFilter("all");
+    setSearchTerm("");
+  }
+
+  const categoryOptions = useMemo(() => {
+    const map = new Map();
+
+    posts.forEach((post) => {
+      const categoryId = post.category?.id;
+      const categoryName = post.category?.name;
+
+      if (categoryId && categoryName) {
+        map.set(String(categoryId), categoryName);
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [posts]);
+
+  const subcategoryOptions = useMemo(() => {
+    const map = new Map();
+
+    posts.forEach((post) => {
+      const categoryId = String(post.category?.id || "");
+
+      if (categoryFilter !== "all" && categoryId !== categoryFilter) {
+        return;
+      }
+
+      const subcategoryId = post.subcategory?.id;
+      const subcategoryName = post.subcategory?.name;
+
+      if (subcategoryId && subcategoryName) {
+        map.set(String(subcategoryId), subcategoryName);
+      }
+    });
+
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [posts, categoryFilter]);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -124,9 +193,9 @@ export default function PostListPage() {
         post.slug,
         post.hashtag,
         post.excerpt,
-        post.author?.username,
         post.category?.name,
         post.subcategory?.name,
+        post.author?.username,
       ]
         .filter(Boolean)
         .some((value) =>
@@ -140,9 +209,24 @@ export default function PostListPage() {
             ? post.status
             : !post.status;
 
-      return matchesSearch && matchesStatus;
+      const matchesCategory =
+        categoryFilter === "all"
+          ? true
+          : String(post.category?.id || "") === categoryFilter;
+
+      const matchesSubcategory =
+        subcategoryFilter === "all"
+          ? true
+          : String(post.subcategory?.id || "") === subcategoryFilter;
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesCategory &&
+        matchesSubcategory
+      );
     });
-  }, [posts, searchTerm, statusFilter]);
+  }, [posts, searchTerm, statusFilter, categoryFilter, subcategoryFilter]);
 
   const totalCount = posts.length;
   const activeCount = posts.filter((post) => post.status).length;
@@ -162,7 +246,8 @@ export default function PostListPage() {
               </h1>
 
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
-                Theo dõi toàn bộ bài viết, lọc nhanh theo trạng thái và đổi active hoặc inactive trực tiếp ngay trên bảng quản lý.
+                Theo dõi toàn bộ bài viết, tìm kiếm nhanh theo tiêu đề hoặc slug
+                và đổi active hoặc inactive trực tiếp ngay trên bảng quản lý.
               </p>
             </div>
 
@@ -196,31 +281,68 @@ export default function PostListPage() {
         </div>
 
         <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_-35px_rgba(15,23,42,0.55)] lg:p-6">
-          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Danh sách bài viết</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Dữ liệu được tải trực tiếp từ backend và cập nhật trạng thái theo thời gian thực.
-              </p>
-            </div>
+          <div className="mb-5">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+              <h2 className="shrink-0 text-xl font-black text-slate-900">
+                Danh sách bài viết
+              </h2>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search by id, title, slug, hashtag, category..."
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white sm:w-80"
-              />
+              <div className="flex flex-wrap items-center gap-3 xl:ml-auto xl:justify-end">
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => {
+                    setCategoryFilter(event.target.value);
+                    setSubcategoryFilter("all");
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-cyan-400"
+                >
+                  <option value="all">Tất cả category</option>
+                  {categoryOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
 
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-cyan-400"
-              >
-                <option value="all">All status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
+                <select
+                  value={subcategoryFilter}
+                  onChange={(event) => setSubcategoryFilter(event.target.value)}
+                  disabled={categoryFilter === "all"}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-cyan-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  <option value="all">Tất cả subcategory</option>
+                  {subcategoryOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-cyan-400"
+                >
+                  <option value="all">All status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Tìm theo id, tiêu đề, slug"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:bg-white sm:w-[220px] xl:w-[260px]"
+                />
+
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
             </div>
           </div>
 
@@ -235,19 +357,19 @@ export default function PostListPage() {
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-slate-500">
                       Bài viết
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Nội dung
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-slate-500">
+                      Danh mục
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Điều hướng
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-slate-500">
+                      Tác giả
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-slate-500">
                       Trạng thái
                     </th>
-                    <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="w-[170px] px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
                       Hành động
                     </th>
                   </tr>
@@ -278,80 +400,67 @@ export default function PostListPage() {
                                 {post.title?.slice(0, 1) || "P"}
                               </div>
 
-                              <div className="min-w-[240px]">
-                                <p className="text-base font-bold text-slate-900">
+                              <div className="max-w-md">
+                                <p className="text-sm font-bold text-slate-900">
                                   {post.title}
                                 </p>
 
-                                <p className="mt-1 text-sm text-slate-500">
-                                  Slug: {post.slug}
-                                </p>
-
-                                <p className="mt-1 text-xs font-medium text-slate-400">
-                                  ID: {post.id}
+                                <p className="mt-1 text-[11px] font-semibold uppercase text-cyan-700">
+                                  /{post.slug}
                                 </p>
                               </div>
                             </div>
                           </td>
 
                           <td className="px-5 py-4 align-top">
-                            <div className="max-w-xl space-y-2">
-                              <p className="text-sm leading-6 text-slate-600">
-                                {post.excerpt || "Chưa có nội dung."}
+                            <div className="space-y-2 text-xs text-slate-600">
+                              <p>
+                                <span className="font-semibold text-slate-900">Category:</span>{" "}
+                                {post.category?.name || "N/A"}
                               </p>
-
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                                  {post.hashtag || "Không có hashtag"}
-                                </span>
-
-                                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                                  {post.author?.username || "Không rõ tác giả"}
-                                </span>
-                              </div>
-
-                              <p className="text-xs text-slate-400">
+                              <p>
+                                <span className="font-semibold text-slate-900">Subcategory:</span>{" "}
+                                {post.subcategory?.name || "N/A"}
+                              </p>
+                              <p className="text-xs text-slate-500">
                                 Tạo lúc: {formatDate(post.create_at)}
                               </p>
                             </div>
                           </td>
 
                           <td className="px-5 py-4 align-top">
-                            <div className="flex min-w-[220px] flex-col gap-2">
-                              <span className="inline-flex w-fit rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700">
-                                {post.category?.name || "Không có category"}
-                              </span>
-
-                              <span className="inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                {post.subcategory?.name || "Không có subcategory"}
-                              </span>
+                            <div className="space-y-2 text-xs text-slate-600">
+                              <p className="font-semibold text-slate-900">
+                                {post.author?.username || "Unknown"}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                Cập nhật: {formatDate(post.update_at)}
+                              </p>
                             </div>
                           </td>
 
                           <td className="px-5 py-4 align-top">
-                            <div className="flex flex-col gap-2">
-                              <select
-                                value={post.status ? "active" : "inactive"}
-                                onChange={(event) =>
-                                  handleOpenConfirm(post.id, event.target.value)
-                                }
-                                disabled={isUpdating}
-                                className={`w-full min-w-36 rounded-2xl border px-4 py-2.5 text-sm font-semibold outline-none transition ${
-                                  post.status
-                                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                    : "border-amber-200 bg-amber-50 text-amber-700"
-                                } ${isUpdating ? "cursor-not-allowed opacity-70" : "focus:border-cyan-400"}`}
-                              >
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                              </select>
-                            </div>
+                            <select
+                              value={post.status ? "active" : "inactive"}
+                              onChange={(event) =>
+                                handleOpenConfirm(post.id, event.target.value)
+                              }
+                              disabled={isUpdating}
+                              className={`w-full min-w-36 rounded-2xl border px-4 py-2.5 text-sm font-semibold outline-none transition ${
+                                post.status
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border-amber-200 bg-amber-50 text-amber-700"
+                              } ${isUpdating ? "cursor-not-allowed opacity-70" : "focus:border-cyan-400"}`}
+                            >
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
                           </td>
 
-                          <td className="px-5 py-4 align-top text-right">
+                          <td className="w-[170px] px-5 py-4 align-top text-left">
                             <button
                               onClick={() => navigate(`/post/update/${post.id}`)}
-                              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                              className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100"
                             >
                               Chỉnh sửa
                             </button>

@@ -13,7 +13,10 @@ def create_app():
     CORS(
         app,
         supports_credentials=True,
-        origins=["http://localhost:5173"]
+        resources={
+            r"/api/*": {"origins": ["http://127.0.0.1:5173"]},
+            r"/auth/*": {"origins": ["http://127.0.0.1:5173"]},
+        },
     )
 
     db.init_app(app)

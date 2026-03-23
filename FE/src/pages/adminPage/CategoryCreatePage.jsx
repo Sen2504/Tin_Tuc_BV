@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createCategoryApi } from "../api/categoryApi";
-import { toSlugPreview } from "../utils/slugPreview";
+import { createCategoryApi } from "@/api/categoryApi";
+import { toSlugPreview } from "@/utils/slugPreview";
 
 export default function CategoryCreatePage() {
   const navigate = useNavigate();

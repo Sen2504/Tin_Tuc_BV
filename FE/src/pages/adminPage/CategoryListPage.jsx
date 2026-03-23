@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCategoriesApi, updateCategoryApi } from "../api/categoryApi";
+import { getCategoriesApi, updateCategoryApi } from "@/api/categoryApi";
 
 export default function CategoryListPage() {
   const navigate = useNavigate();
@@ -15,6 +15,9 @@ export default function CategoryListPage() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedNextStatus, setSelectedNextStatus] = useState(null);
+  const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
+  const [selectedDescription, setSelectedDescription] = useState("");
+  const [selectedDescriptionTitle, setSelectedDescriptionTitle] = useState("");
 
   async function loadCategories() {
     setLoading(true);
@@ -49,6 +52,18 @@ export default function CategoryListPage() {
     setConfirmModalOpen(false);
     setSelectedCategory(null);
     setSelectedNextStatus(null);
+  }
+
+  function handleOpenDescription(categoryName, description) {
+    setSelectedDescriptionTitle(categoryName || "Danh mục");
+    setSelectedDescription(description || "Chưa có mô tả.");
+    setDescriptionModalOpen(true);
+  }
+
+  function handleCloseDescription() {
+    setDescriptionModalOpen(false);
+    setSelectedDescription("");
+    setSelectedDescriptionTitle("");
   }
 
   async function handleConfirmStatusChange() {
@@ -210,19 +225,19 @@ export default function CategoryListPage() {
 
           <div className="overflow-hidden rounded-[24px] border border-slate-200">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200">
+              <table className="min-w-full table-fixed divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="w-[28%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Danh mục
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="w-[38%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Mô tả
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="w-[16%] px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Trạng thái
                     </th>
-                    <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="w-[18%] px-4 py-3 text-right text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
                       Hành động
                     </th>
                   </tr>
@@ -244,30 +259,47 @@ export default function CategoryListPage() {
                   ) : (
                     filteredCategories.map((category) => {
                       const isUpdating = updatingIds.includes(category.id);
+                      const descriptionText = category.description || "Chưa có mô tả.";
+                      const isLongDescription = descriptionText.length > 90;
 
                       return (
                         <tr key={category.id} className="transition hover:bg-slate-50/80">
-                          <td className="px-5 py-4 align-top">
-                            <div className="flex items-start gap-4">
-                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-black uppercase text-white shadow-lg shadow-cyan-500/20">
+                          <td className="px-4 py-3 align-top">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-xs font-black uppercase text-white shadow-md shadow-cyan-500/20">
                                 {category.name?.slice(0, 1) || "C"}
                               </div>
 
-                              <div>
-                                <p className="mt-1 text-base font-bold text-slate-900">
+                              <div className="max-w-[240px]">
+                                <p className="mt-0.5 break-words text-[13px] font-semibold leading-5 text-slate-900">
                                   {category.name}
                                 </p>
                               </div>
                             </div>
                           </td>
 
-                          <td className="px-5 py-4 align-top">
-                            <p className="max-w-xl text-sm leading-6 text-slate-600">
-                              {category.description || "Chưa có mô tả."}
+                          <td className="px-4 py-3 align-top">
+                            <p
+                              className="max-w-[340px] truncate text-[12px] leading-5 text-slate-600"
+                              title={descriptionText}
+                            >
+                              {descriptionText}
                             </p>
+
+                            {/* {isLongDescription && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenDescription(category.name, descriptionText)
+                                }
+                                className="mt-1 text-[11px] font-semibold text-cyan-700 transition hover:text-cyan-600"
+                              >
+                                Xem
+                              </button>
+                            )} */}
                           </td>
 
-                          <td className="px-5 py-4 align-top">
+                          <td className="px-4 py-3 align-top">
                             <div className="flex flex-col gap-2">
                               <select
                                 value={category.status ? "active" : "inactive"}
@@ -275,7 +307,7 @@ export default function CategoryListPage() {
                                   handleOpenConfirm(category.id, event.target.value)
                                 }
                                 disabled={isUpdating}
-                                className={`w-full min-w-36 rounded-2xl border px-4 py-2.5 text-sm font-semibold outline-none transition ${
+                                className={`w-[122px] rounded-xl border px-3 py-2 text-[12px] font-semibold outline-none transition ${
                                   category.status
                                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                                     : "border-amber-200 bg-amber-50 text-amber-700"
@@ -287,10 +319,10 @@ export default function CategoryListPage() {
                             </div>
                           </td>
 
-                          <td className="px-5 py-4 align-top text-right">
+                          <td className="px-4 py-3 align-top text-right">
                             <button
                               onClick={() => navigate(`/category/update/${category.id}`)}
-                              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                              className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
                             >
                               Chỉnh sửa
                             </button>
@@ -304,13 +336,33 @@ export default function CategoryListPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-col gap-2 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
             <p>
               Đang hiển thị {filteredCategories.length} / {totalCount} danh mục
             </p>
           </div>
         </div>
       </section>
+
+      {descriptionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-black text-slate-900">{selectedDescriptionTitle}</h3>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">{selectedDescription}</p>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={handleCloseDescription}
+                className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">

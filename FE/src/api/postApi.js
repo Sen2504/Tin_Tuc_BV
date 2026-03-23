@@ -10,9 +10,14 @@ async function parseResponse(response) {
   };
 }
 
+// API PUBLIC ra giao diện
 export async function getPostsBySubcategorySlugApi(categorySlug, subcategorySlug) {
   const response = await fetch(
-    `${API_BASE_URL}/api/posts/${categorySlug}/${subcategorySlug}`
+    `${API_BASE_URL}/api/posts/${categorySlug}/${subcategorySlug}`,
+    {
+      method: "GET",
+      credentials: "include",
+    }
   );
 
   return parseResponse(response);
@@ -20,8 +25,82 @@ export async function getPostsBySubcategorySlugApi(categorySlug, subcategorySlug
 
 export async function getPostDetailBySlugApi(categorySlug, subcategorySlug, postSlug) {
   const response = await fetch(
-    `${API_BASE_URL}/api/posts/${categorySlug}/${subcategorySlug}/${postSlug}`
+    `${API_BASE_URL}/api/posts/${categorySlug}/${subcategorySlug}/${postSlug}`,
+    {
+      method: "GET",
+      credentials: "include",
+    }
   );
 
   return parseResponse(response);
+}
+
+// API PRIVATE ra giao diện quản trị
+export async function getPostByIdApi(postId) {
+  const response = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  return parseResponse(response);
+}
+
+export async function createPostApi(payload) {
+  const response = await fetch(`${API_BASE_URL}/api/posts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  return parseResponse(response);
+}
+
+export async function updatePostApi(postId, payload) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+// API dùng chung cho cả giao diện người dùng và quản trị
+export async function getPostsApi() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/posts`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
 }

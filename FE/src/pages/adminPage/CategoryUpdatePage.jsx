@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { updateCategoryApi, getCategoryByIdApi } from "../api/categoryApi";
-import { toSlugPreview } from "../utils/slugPreview";
+import { updateCategoryApi, getCategoryByIdApi } from "@/api/categoryApi";
+import { toSlugPreview } from "@/utils/slugPreview";
 
 export default function CategoryUpdatePage() {
   const navigate = useNavigate();

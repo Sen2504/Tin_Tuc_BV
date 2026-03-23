@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { getSubCategoriesApi, updateSubCategoryApi } from "../api/subcategoryApi";
+import { getSubCategoriesApi, updateSubCategoryApi } from "@/api/subcategoryApi";
 
 export default function SubCategoryListPage() {
   const navigate = useNavigate();
@@ -36,6 +36,12 @@ export default function SubCategoryListPage() {
 
     setSubcategories(result.data.subcategories || []);
     setLoading(false);
+  }
+
+  function handleClearFilters() {
+    setParentFilter("all");
+    setStatusFilter("all");
+    setSearchTerm("");
   }
 
   function handleOpenConfirm(subcategory, nextValue) {
@@ -190,18 +196,21 @@ export default function SubCategoryListPage() {
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-xl font-black text-zinc-900">Danh sách danh mục con</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Giao diện này dùng màu nhận diện riêng để tránh nhầm với danh mục cha.
-            </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Tìm theo id, tên, category"
-              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:border-orange-400 focus:bg-white"
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={parentFilter}
+              onChange={(event) => setParentFilter(event.target.value)}
+              className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-medium text-zinc-700 outline-none transition focus:border-orange-400"
+            >
+              <option value="all">Tất cả danh mục cha</option>
+              {parentCategoryOptions.map((categoryName) => (
+                <option key={categoryName} value={categoryName}>
+                  {categoryName}
+                </option>
+              ))}
+            </select>
 
             <select
               value={statusFilter}
@@ -212,6 +221,21 @@ export default function SubCategoryListPage() {
               <option value="active">Active</option>
               <option value="inactive">Hidden</option>
             </select>
+
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Tìm theo id, tên, category"
+              className="w-full rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 outline-none transition placeholder:text-zinc-400 focus:border-orange-400 focus:bg-white sm:w-64 xl:w-72"
+            />
+
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
+            >
+              Xóa bộ lọc
+            </button>
           </div>
         </div>
 
@@ -226,30 +250,16 @@ export default function SubCategoryListPage() {
             <table className="min-w-full divide-y divide-zinc-200">
               <thead className="bg-zinc-50">
                 <tr>
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
                     Danh mục con
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
-                    <div className="flex min-w-[140px] flex-col gap-2">
-                      <span>Danh mục cha</span>
-                      <select
-                        value={parentFilter}
-                        onChange={(event) => setParentFilter(event.target.value)}
-                        className="w-auto self-start rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[11px] font-semibold normal-case tracking-normal text-zinc-700 outline-none transition focus:border-orange-400"
-                      >
-                        <option value="all">Tất cả danh mục cha</option>
-                        {parentCategoryOptions.map((categoryName) => (
-                          <option key={categoryName} value={categoryName}>
-                            {categoryName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
+                    Danh mục cha
                   </th>
-                  <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
                     Trạng thái
                   </th>
-                  <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+                  <th className="w-[170px] px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
                     Hành động
                   </th>
                 </tr>
@@ -282,7 +292,7 @@ export default function SubCategoryListPage() {
                           </div>
 
                           <div>
-                            <p className="text-base font-bold text-zinc-900">{sub.name}</p>
+                            <p className="text-sm font-bold text-zinc-900">{sub.name}</p>
                             {/* <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
                               ID: {sub.id}
                             </p> */}
@@ -291,7 +301,7 @@ export default function SubCategoryListPage() {
                       </td>
 
                       <td className="px-5 py-4 align-top">
-                        <p className="text-sm font-medium text-zinc-700">{sub.category_name || "N/A"}</p>
+                        <p className="text-xs font-medium text-zinc-700">{sub.category_name || "N/A"}</p>
                       </td>
 
                       <td className="px-5 py-4 align-top">
@@ -301,7 +311,7 @@ export default function SubCategoryListPage() {
                             handleOpenConfirm(sub, event.target.value)
                           }
                           disabled={isUpdating}
-                          className={`w-full min-w-36 rounded-2xl border px-4 py-2.5 text-sm font-semibold outline-none transition ${
+                          className={`w-[122px] rounded-xl border px-3 py-2 text-[12px] font-semibold outline-none transition ${
                             sub.status
                               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                               : "border-rose-200 bg-rose-50 text-rose-700"
@@ -312,7 +322,7 @@ export default function SubCategoryListPage() {
                         </select>
                       </td>
 
-                      <td className="px-5 py-4 align-top text-right">
+                      <td className="w-[170px] px-5 py-4 align-top text-left">
                         <button
                           onClick={() => navigate(`/subcategory/update/${sub.id}`)}
                           className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100"

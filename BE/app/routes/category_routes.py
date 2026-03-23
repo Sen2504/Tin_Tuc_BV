@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_login import login_required
 
 from app.services.category_service import CategoryService
 from app.models.category import Category
@@ -37,54 +38,9 @@ def serialize_category(category, include_subcategories=False):
     return data
 
 
-@category_bp.route("", methods=["POST"])
-def create_category():
-    data = request.get_json(silent=True) or {}
-
-    name = data.get("name")
-    description = data.get("description")
-    status = data.get("status", True)
-
-    if not name:
-        return jsonify({"error": "name is required"}), 400
-
-    category, error = CategoryService.create_category(
-        name=name,
-        description=description,
-        status=status
-    )
-
-    if error:
-        return jsonify({"error": error}), 400
-
-    return jsonify({
-        "message": "category created",
-        "category": serialize_category(category)
-    }), 201
-
-
-@category_bp.route("/<int:category_id>", methods=["PUT"])
-def update_category(category_id):
-    data = request.get_json(silent=True) or {}
-
-    category, error = CategoryService.update_category(
-        category_id=category_id,
-        name=data.get("name"),
-        description=data.get("description"),
-        status=data.get("status")
-    )
-
-    if error:
-        status_code = 404 if "not found" in error else 400
-        return jsonify({"error": error}), status_code
-
-    return jsonify({
-        "message": "category updated",
-        "category": serialize_category(category)
-    })
-
-
+# Các route của ADMIN
 @category_bp.route("", methods=["GET"])
+@login_required
 def get_categories():
     include_inactive = request.args.get("include_inactive", "false").lower() in {"1", "true", "yes"}
 
@@ -113,6 +69,7 @@ def get_categories():
 
 
 @category_bp.route("/<int:category_id>", methods=["GET"])
+@login_required
 def get_category(category_id):
     category = CategoryService.get_category(category_id)
 
@@ -122,6 +79,56 @@ def get_category(category_id):
     return jsonify(serialize_category(category))
 
 
+@category_bp.route("", methods=["POST"])
+@login_required
+def create_category():
+    data = request.get_json(silent=True) or {}
+
+    name = data.get("name")
+    description = data.get("description")
+    status = data.get("status", True)
+
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    category, error = CategoryService.create_category(
+        name=name,
+        description=description,
+        status=status
+    )
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    return jsonify({
+        "message": "category created",
+        "category": serialize_category(category)
+    }), 201
+
+
+@category_bp.route("/<int:category_id>", methods=["PUT"])
+@login_required
+def update_category(category_id):
+    data = request.get_json(silent=True) or {}
+
+    category, error = CategoryService.update_category(
+        category_id=category_id,
+        name=data.get("name"),
+        description=data.get("description"),
+        status=data.get("status")
+    )
+
+    if error:
+        status_code = 404 if "not found" in error else 400
+        return jsonify({"error": error}), status_code
+
+    return jsonify({
+        "message": "category updated",
+        "category": serialize_category(category)
+    })
+
+
+# Các route PUBLIC ra giao diện
 @category_bp.route("/<string:slug>/subcategories", methods=["GET"])
 def get_category_subcategories_by_slug(slug):
     category = CategoryService.get_category_by_slug(slug)

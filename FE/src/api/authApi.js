@@ -1,7 +1,7 @@
-const API_BASE = "http://localhost:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export async function loginApi(payload) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -15,7 +15,7 @@ export async function loginApi(payload) {
 }
 
 export async function logoutApi() {
-  const res = await fetch(`${API_BASE}/auth/logout`, {
+  const res = await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: "POST",
     credentials: "include",
   });
@@ -25,7 +25,7 @@ export async function logoutApi() {
 }
 
 export async function meApi() {
-  const res = await fetch(`${API_BASE}/auth/me`, {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
     method: "GET",
     credentials: "include",
   });
@@ -36,7 +36,7 @@ export async function meApi() {
 
 export async function forgotPasswordApi(data) {
   try {
-    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
