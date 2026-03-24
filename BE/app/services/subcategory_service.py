@@ -53,6 +53,38 @@ class SubCategoryService:
         return media, None
 
     @staticmethod
+    def _delete_media_file(media):
+        if not media or not media.file_path:
+            return
+
+        try:
+            upload_root = current_app.config.get(
+                "UPLOAD_FOLDER",
+                os.path.join(current_app.root_path, "uploads")
+            )
+
+            relative_path = media.file_path.lstrip("/\\")
+            if relative_path.startswith("uploads/"):
+                relative_path = relative_path[len("uploads/"):]
+
+            absolute_path = os.path.join(upload_root, relative_path)
+
+            if os.path.exists(absolute_path):
+                os.remove(absolute_path)
+        except Exception as e:
+            current_app.logger.warning(
+                f"Không thể xóa file media {getattr(media, 'id', None)}: {str(e)}"
+            )
+
+    @staticmethod
+    def _delete_media(media):
+        if not media:
+            return
+
+        SubCategoryService._delete_media_file(media)
+        db.session.delete(media)
+
+    @staticmethod
     def create_subcategory(name, category_id, description=None, status=True, thumbnail_file=None):
         category = Category.query.get(category_id)
 
@@ -133,6 +165,8 @@ class SubCategoryService:
         if duplicated:
             return None, "Danh mục con đã tồn tại"
 
+        old_thumbnail_media = subcategory.thumbnail_media
+
         if name is not None and name.strip():
             subcategory.name = next_name
             subcategory.slug = generate_unique_slug(
@@ -150,22 +184,42 @@ class SubCategoryService:
         if category_id is not None:
             subcategory.category_id = category_id
 
-        if remove_thumbnail:
-            subcategory.thumbnail_media_id = None
+        try:
+            # user bấm xóa thumbnail hiện tại
+            if remove_thumbnail:
+                subcategory.thumbnail_media_id = None
 
-        if thumbnail_file:
-            thumbnail_media, error = SubCategoryService._save_thumbnail_file(
-                thumbnail_file,
-                caption=f"Thumbnail - {subcategory.name}"
+            # user upload thumbnail mới
+            if thumbnail_file:
+                thumbnail_media, error = SubCategoryService._save_thumbnail_file(
+                    thumbnail_file,
+                    caption=f"Thumbnail - {subcategory.name}"
+                )
+                if error:
+                    db.session.rollback()
+                    return None, error
+
+                subcategory.thumbnail_media_id = thumbnail_media.id
+
+            db.session.flush()
+
+            should_delete_old_media = (
+                old_thumbnail_media is not None and (
+                    remove_thumbnail or thumbnail_file
+                )
             )
-            if error:
-                return None, error
 
-            subcategory.thumbnail_media_id = thumbnail_media.id
+            if should_delete_old_media:
+                # chỉ xóa nếu subcategory không còn trỏ tới media cũ nữa
+                if subcategory.thumbnail_media_id != old_thumbnail_media.id:
+                    SubCategoryService._delete_media(old_thumbnail_media)
 
-        db.session.commit()
+            db.session.commit()
+            return subcategory, None
 
-        return subcategory, None
+        except Exception as e:
+            db.session.rollback()
+            return None, str(e)
 
     @staticmethod
     def get_subcategories():
@@ -186,8 +240,15 @@ class SubCategoryService:
         if not subcategory:
             return False, "Danh mục con không tìm thấy"
 
+        old_thumbnail_media = subcategory.thumbnail_media
+
         try:
             db.session.delete(subcategory)
+            db.session.flush()
+
+            if old_thumbnail_media:
+                SubCategoryService._delete_media(old_thumbnail_media)
+
             db.session.commit()
             return True, None
         except Exception as e:

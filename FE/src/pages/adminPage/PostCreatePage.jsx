@@ -1,9 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PostEditor from "../../components/PostEditor";
 import { getCategoriesApi } from "@/api/categoryApi";
 import { createPostApi } from "@/api/postApi";
+import ToastStack from "@/components/ToastStack";
 import { toSlugPreview } from "@/utils/slugPreview";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 function normalizeHashtag(rawValue = "") {
   const slug = toSlugPreview(rawValue.replace(/^#+/, ""));
@@ -33,8 +48,33 @@ export default function CreatePostPage() {
     status: true,
     content: "",
   });
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [redirectToastId, setRedirectToastId] = useState(null);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    const toastId = crypto.randomUUID();
+
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: toastId,
+        type,
+        message,
+        duration,
+      },
+    ]);
+
+    return toastId;
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+
+    if (id === redirectToastId) {
+      setRedirectToastId(null);
+      navigate("/post/list");
+    }
+  }, [navigate, redirectToastId]);
 
   const slugPreview = useMemo(() => toSlugPreview(form.title), [form.title]);
 
@@ -50,8 +90,7 @@ export default function CreatePostPage() {
     const result = await getCategoriesApi();
 
     if (!result.ok) {
-      setIsError(true);
-      setMessage(result.data?.error || "Không tải được category");
+      showPopup("error", getBackendMessage(result.data, "Không tải được category"));
       return;
     }
 
@@ -136,12 +175,10 @@ export default function CreatePostPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("");
-    setIsError(false);
+    setRedirectToastId(null);
 
     if (!selectedSubcategoryId) {
-      setIsError(true);
-      setMessage("Vui lòng chọn subcategory trước khi tạo bài viết");
+      showPopup("error", "Vui lòng chọn subcategory trước khi tạo bài viết");
       return;
     }
 
@@ -156,13 +193,15 @@ export default function CreatePostPage() {
     const result = await createPostApi(payload);
 
     if (!result.ok) {
-      setIsError(true);
-      setMessage(result.data?.error || "Tạo bài viết thất bại");
+      showPopup("error", getBackendMessage(result.data, "Tạo bài viết thất bại"));
       return;
     }
 
-    setIsError(false);
-    setMessage(result.data?.message || "Tạo bài viết thành công");
+    const successToastId = showPopup(
+      "success",
+      getBackendMessage(result.data, "Tạo bài viết thành công")
+    );
+    setRedirectToastId(successToastId);
   }
 
   return (
@@ -181,18 +220,6 @@ export default function CreatePostPage() {
           </p>
         </div>
       </div>
-
-      {message && (
-        <div
-          className={`relative mb-6 rounded-xl border px-4 py-3 text-sm ${
-            isError
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="relative space-y-6">
         <div className="grid gap-4 lg:grid-cols-12">
@@ -399,6 +426,8 @@ export default function CreatePostPage() {
           </button>
         </div>
       </form>
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </section>
   );
 }

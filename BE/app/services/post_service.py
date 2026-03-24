@@ -8,6 +8,8 @@ from app.models.media_post import PostMedia
 from app.models.sub_category import SubCategory
 from sqlalchemy.orm import joinedload
 import unicodedata
+import os
+from flask import current_app
 
 def strip_html(value):
     if not value:
@@ -89,6 +91,54 @@ class PostService:
                 ids.append(media_id)
 
         return ids
+    
+    @staticmethod
+    def _get_media_ids_of_post(post_id: int) -> list[int]:
+        rows = (
+            db.session.query(PostMedia.media_id)
+            .filter(PostMedia.post_id == post_id)
+            .all()
+        )
+        return [row[0] for row in rows]
+    
+    @staticmethod
+    def _delete_media_file(media):
+        if not media or not media.file_path:
+            return
+
+        try:
+            relative_path = media.file_path.lstrip("/\\")
+            absolute_path = os.path.join(current_app.root_path, relative_path)
+
+            if os.path.exists(absolute_path):
+                os.remove(absolute_path)
+        except Exception:
+            # Có thể log ra nếu muốn, nhưng đừng làm crash cả request
+            pass
+
+    @staticmethod
+    def _cleanup_unused_medias(media_ids: list[int]):
+        if not media_ids:
+            return
+
+        unique_ids = list(set(media_ids))
+
+        for media_id in unique_ids:
+            still_used = (
+                db.session.query(PostMedia.id)
+                .filter(PostMedia.media_id == media_id)
+                .first()
+            )
+
+            if still_used:
+                continue
+
+            media = Media.query.filter(Media.id == media_id).first()
+            if not media:
+                continue
+
+            PostService._delete_media_file(media)
+            db.session.delete(media)
 
     @staticmethod
     def create_post(title, content, hashtag, status, subcategory_id, author_id):
@@ -341,9 +391,19 @@ class PostService:
                 exclude_post_id=post.id
             )
 
-        media_ids = PostService._extract_media_ids_from_content(next_content)
+        old_media_ids = PostService._get_media_ids_of_post(post.id)
+        new_media_ids = PostService._extract_media_ids_from_content(next_content)
 
         try:
+            # kiểm tra media mới có tồn tại không
+            if new_media_ids:
+                medias = Media.query.filter(Media.id.in_(new_media_ids)).all()
+                existing_ids = {m.id for m in medias}
+
+                missing_ids = [mid for mid in new_media_ids if mid not in existing_ids]
+                if missing_ids:
+                    return None, f"Media không tồn tại: {missing_ids}"
+
             post.title = next_title
             post.slug = next_slug
             post.content = next_content
@@ -351,23 +411,20 @@ class PostService:
             post.status = next_status
             post.subcategory = next_subcategory
 
+            # xóa toàn bộ link cũ
             db.session.query(PostMedia).filter_by(post_id=post.id).delete()
 
-            if media_ids:
-                medias = Media.query.filter(Media.id.in_(media_ids)).all()
-                existing_ids = {m.id for m in medias}
+            # thêm link mới
+            for media_id in new_media_ids:
+                db.session.add(PostMedia(
+                    post_id=post.id,
+                    media_id=media_id
+                ))
 
-                missing_ids = [mid for mid in media_ids if mid not in existing_ids]
-                if missing_ids:
-                    db.session.rollback()
-                    return None, f"Media không tồn tại: {missing_ids}"
+            db.session.flush()
 
-                for media_id in media_ids:
-                    link = PostMedia(
-                        post_id=post.id,
-                        media_id=media_id
-                    )
-                    db.session.add(link)
+            removed_media_ids = list(set(old_media_ids) - set(new_media_ids))
+            PostService._cleanup_unused_medias(removed_media_ids)
 
             db.session.commit()
             db.session.refresh(post)
@@ -394,3 +451,24 @@ class PostService:
             return None, "post not found"
 
         return post, None
+
+    @staticmethod
+    def delete_post(post_id):
+        post = Post.query.filter(Post.id == post_id).first()
+
+        if not post:
+            return False, "post not found"
+
+        media_ids = PostService._get_media_ids_of_post(post.id)
+
+        try:
+            db.session.delete(post)
+            db.session.flush()
+
+            PostService._cleanup_unused_medias(media_ids)
+
+            db.session.commit()
+            return True, None
+        except Exception as e:
+            db.session.rollback()
+            return False, str(e)

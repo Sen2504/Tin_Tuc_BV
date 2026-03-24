@@ -13,6 +13,7 @@ export default function UserListPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [updatingIds, setUpdatingIds] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const [confirmModal, setConfirmModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -30,6 +31,7 @@ export default function UserListPage() {
 
     if (result.ok) {
       setUsers(result.data.users || []);
+      setCurrentUser(result.data.current_user || null);
     } else {
       setMessage(result.data?.error || "Không thể tải danh sách người dùng");
     }
@@ -37,7 +39,34 @@ export default function UserListPage() {
     setLoading(false);
   }
 
+  function isTargetAdminUser(user) {
+    const normalizedRole = String(user?.role || "").toLowerCase();
+    const normalizedUsername = String(user?.username || "").toLowerCase();
+    return normalizedRole === "admin" || normalizedUsername === "admin";
+  }
+
+  function canEditRow(user) {
+    if (!currentUser) return false;
+
+    const currentRole = String(currentUser.role || "").toLowerCase();
+    if (currentRole === "admin") return true;
+
+    return currentUser.id === user.id;
+  }
+
+  function canChangeStatus(user) {
+    if (!canEditRow(user)) return false;
+    if (isTargetAdminUser(user)) return false;
+    if (!user.is_active) return false;
+
+    return true;
+  }
+
   function handleSelectChange(user, value) {
+    if (!canChangeStatus(user)) {
+      return;
+    }
+
     if (user.is_active === (value === "active")) {
       return;
     }
@@ -115,7 +144,8 @@ export default function UserListPage() {
   const totalCount = users.length;
   const activeCount = users.filter((user) => user.is_active).length;
   const inactiveCount = totalCount - activeCount;
-  const adminCount = users.filter((user) => user.role === "admin").length;
+  const adminCount = users.filter((user) => String(user.role || "").toLowerCase() === "admin").length;
+  const isCurrentAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
 
   return (
     <>
@@ -132,12 +162,14 @@ export default function UserListPage() {
               </p>
             </div>
 
-            <button
-              onClick={() => navigate("/user/create")}
-              className="inline-flex items-center justify-center rounded-2xl bg-rose-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-rose-300"
-            >
-              + Tạo tài khoản mới
-            </button>
+            {isCurrentAdmin && (
+              <button
+                onClick={() => navigate("/user/create")}
+                className="inline-flex items-center justify-center rounded-2xl bg-rose-400 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-rose-300"
+              >
+                + Tạo tài khoản mới
+              </button>
+            )}
           </div>
         </div>
 
@@ -217,22 +249,22 @@ export default function UserListPage() {
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">
                       Người dùng
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">
                       Email
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">
                       Vai trò
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">
                       Trạng thái
                     </th>
-                    <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Ngày tạo
+                    <th className="px-5 py-4 text-left text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">
+                      Xác thực
                     </th>
-                    <th className="px-5 py-4 text-right text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-5 py-4 text-right text-[11px] font-bold uppercase tracking-[0.06em] text-slate-500">
                       Hành động
                     </th>
                   </tr>
@@ -254,6 +286,9 @@ export default function UserListPage() {
                   ) : (
                     filteredUsers.map((user) => {
                       const isUpdating = updatingIds.includes(user.id);
+                      const rowCanEdit = canEditRow(user);
+                      const rowCanChangeStatus = canChangeStatus(user);
+                      const isLockedStatus = !rowCanChangeStatus;
 
                       return (
                         <tr key={user.id} className="transition hover:bg-slate-50/80">
@@ -264,7 +299,7 @@ export default function UserListPage() {
                               </div>
 
                               <div>
-                                <p className="text-base font-bold text-slate-900">
+                                <p className="text-sm font-bold text-slate-900">
                                   {user.username}
                                 </p>
                                 {/* <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
@@ -275,7 +310,7 @@ export default function UserListPage() {
                           </td>
 
                           <td className="px-5 py-4 align-top">
-                            <p className="max-w-[280px] truncate text-sm text-slate-600" title={user.email}>
+                            <p className="max-w-[280px] truncate text-xs text-slate-600" title={user.email}>
                               {user.email}
                             </p>
                           </td>
@@ -298,29 +333,41 @@ export default function UserListPage() {
                               onChange={(event) =>
                                 handleSelectChange(user, event.target.value)
                               }
-                              disabled={isUpdating}
-                              className={`w-full min-w-36 rounded-2xl border px-4 py-2.5 text-sm font-semibold outline-none transition ${
+                              disabled={isUpdating || isLockedStatus}
+                              className={`w-full min-w-36 rounded-2xl border px-3 py-2 text-xs font-semibold outline-none transition ${
                                 user.is_active
                                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                                   : "border-amber-200 bg-amber-50 text-amber-700"
-                              } ${isUpdating ? "cursor-not-allowed opacity-70" : "focus:border-rose-400"}`}
+                              } ${(isUpdating || isLockedStatus) ? "cursor-not-allowed opacity-70" : "focus:border-rose-400"}`}
                             >
                               <option value="active">Active</option>
                               <option value="inactive">Inactive</option>
                             </select>
                           </td>
 
-                          <td className="px-5 py-4 align-top text-sm text-slate-500">
-                            {new Date(user.created_at).toLocaleDateString("vi-VN")}
+                          <td className="px-5 py-4 align-top">
+                            {user.confirmed ? (
+                              <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                Đã xác thực
+                              </span>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                                Chưa xác thực
+                              </span>
+                            )}
                           </td>
 
                           <td className="px-5 py-4 align-top text-right">
-                            <button
-                              onClick={() => navigate(`/user/edit/${user.id}`)}
-                              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-                            >
-                              Chỉnh sửa
-                            </button>
+                            {rowCanEdit ? (
+                              <button
+                                onClick={() => navigate(`/user/edit/${user.id}`)}
+                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                              >
+                                Chỉnh sửa
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400">-</span>
+                            )}
                           </td>
                         </tr>
                       );

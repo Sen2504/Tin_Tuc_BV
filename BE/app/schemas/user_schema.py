@@ -1,5 +1,9 @@
 import re
-from marshmallow import Schema, fields, validates, validates_schema, ValidationError
+from marshmallow import Schema, fields, validates, ValidationError
+
+
+def normalize_role(value):
+    return (value or "").strip().lower()
 
 
 class UserCreateSchema(Schema):
@@ -13,14 +17,14 @@ class UserCreateSchema(Schema):
     def validate_username(self, value, **kwargs):
         value = (value or "").strip()
 
+        if not value:
+            raise ValidationError("Username is required.")
+
         if len(value) < 3:
             raise ValidationError("Username must be at least 3 characters.")
 
         if len(value) > 100:
             raise ValidationError("Username must not exceed 100 characters.")
-
-        if not re.match(r"^[a-zA-Z0-9_]+$", value):
-            raise ValidationError("Username can only contain letters, numbers, and underscore.")
 
     @validates("password")
     def validate_password(self, value, **kwargs):
@@ -35,7 +39,7 @@ class UserCreateSchema(Schema):
 
     @validates("role")
     def validate_role(self, value, **kwargs):
-        if value not in ["admin", "staff"]:
+        if normalize_role(value) not in ["admin", "staff"]:
             raise ValidationError("Role must be either 'admin' or 'staff'.")
 
 
@@ -50,14 +54,14 @@ class UserUpdateSchema(Schema):
     def validate_username(self, value, **kwargs):
         value = (value or "").strip()
 
+        if not value:
+            raise ValidationError("Username cannot be empty.")
+
         if len(value) < 3:
             raise ValidationError("Username must be at least 3 characters.")
 
         if len(value) > 100:
             raise ValidationError("Username must not exceed 100 characters.")
-
-        if not re.match(r"^[a-zA-Z0-9_]+$", value):
-            raise ValidationError("Username can only contain letters, numbers, and underscore.")
 
     @validates("password")
     def validate_password(self, value, **kwargs):
@@ -72,7 +76,7 @@ class UserUpdateSchema(Schema):
 
     @validates("role")
     def validate_role(self, value, **kwargs):
-        if value not in ["admin", "staff"]:
+        if normalize_role(value) not in ["admin", "staff"]:
             raise ValidationError("Role must be either 'admin' or 'staff'.")
 
 

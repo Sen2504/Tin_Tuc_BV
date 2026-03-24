@@ -29,13 +29,17 @@ export default function Header() {
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
-              <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full border-[3px] border-sky-500 shadow-md">
+              <Link
+                to="/"
+                aria-label="Về trang chủ"
+                className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-xl border-[3px] border-sky-500 shadow-md transition hover:opacity-90"
+              >
                 <img
                   src={logo}
                   alt="Logo"
                   className="h-full w-full object-contain"
                 />
-              </div>
+              </Link>
             </div>
 
             <div>

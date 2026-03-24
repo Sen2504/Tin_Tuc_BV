@@ -17,7 +17,7 @@ export default function AdminLayout({ setIsAuthenticated }) {
       try {
         const result = await meApi();
         if (result.ok) {
-          setCurrentUser(result.data?.user || null);
+          setCurrentUser(result.data?.user || result.data || null);
           return;
         }
         setCurrentUser(null);
@@ -72,14 +72,41 @@ export default function AdminLayout({ setIsAuthenticated }) {
     });
   }
 
-  const userName = currentUser?.username || "Admin";
-  const userRole = currentUser?.role || "admin";
+  const userName = currentUser?.username || "Người dùng";
+  const userRole = currentUser?.role || "staff";
+  const isCurrentAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
 
   const menuItems = [
+    {
+      label: "Tài khoản của tôi",
+      path: "/user/update",
+      paths: ["/user/update"],
+      icon: (
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 20a8 8 0 0116 0"
+          />
+        </svg>
+      ),
+    },
     {
       label: "Quản lý nhân viên",
       path: "/user/list",
       paths: ["/user/list", "/user/create", "/user/edit"],
+      adminOnly: true,
       icon: (
         <svg
           className="h-5 w-5"
@@ -169,6 +196,13 @@ export default function AdminLayout({ setIsAuthenticated }) {
     },
   ];
 
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (item.adminOnly) {
+      return isCurrentAdmin;
+    }
+    return true;
+  });
+
   function isActiveMenu(paths) {
     return paths.some((path) => location.pathname.startsWith(path));
   }
@@ -228,7 +262,7 @@ export default function AdminLayout({ setIsAuthenticated }) {
           </div>
 
           <nav className="space-y-2">
-            {menuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
               const active = isActiveMenu(item.paths);
 
               return (

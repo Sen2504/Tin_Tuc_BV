@@ -139,8 +139,22 @@ def update_post(post_id):
         return jsonify({"error": error}), status_code
 
     return jsonify({
-        "message": "post updated",
+        "message": "Bài viết đã được cập nhật",
         "post": post_response_schema.dump(post)
+    }), 200
+
+
+@post_bp.route("/<int:post_id>", methods=["DELETE"])
+@login_required
+def delete_post(post_id):
+    deleted, error = PostService.delete_post(post_id)
+
+    if error:
+        status_code = 404 if "not found" in error.lower() else 400
+        return jsonify({"error": error}), status_code
+
+    return jsonify({
+        "message": "Xóa bài viết thành công"
     }), 200
 
 

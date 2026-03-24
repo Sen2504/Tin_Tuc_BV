@@ -1,8 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PostEditor from "@/components/PostEditor";
+import ToastStack from "@/components/ToastStack";
 import { getCategoriesApi } from "@/api/categoryApi";
 import { getPostByIdApi, updatePostApi } from "@/api/postApi";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 function toSlugPreview(value = "") {
   return value
@@ -84,9 +99,34 @@ export default function PostUpdatePage() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [redirectToastId, setRedirectToastId] = useState(null);
   const [isStatusUnlocked, setIsStatusUnlocked] = useState(false);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    const toastId = crypto.randomUUID();
+
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: toastId,
+        type,
+        message,
+        duration,
+      },
+    ]);
+
+    return toastId;
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+
+    if (id === redirectToastId) {
+      setRedirectToastId(null);
+      navigate("/post/list");
+    }
+  }, [navigate, redirectToastId]);
 
   const slugPreview = useMemo(() => toSlugPreview(form.title), [form.title]);
   
@@ -126,8 +166,6 @@ export default function PostUpdatePage() {
 
   async function loadInitialData() {
     setLoading(true);
-    setMessage("");
-    setIsError(false);
 
     try {
       const [categoryResult, postResult] = await Promise.all([
@@ -136,15 +174,13 @@ export default function PostUpdatePage() {
       ]);
 
       if (!categoryResult.ok) {
-        setIsError(true);
-        setMessage(categoryResult.data?.error || "Không tải được category");
+        showPopup("error", getBackendMessage(categoryResult.data, "Không tải được category"));
         setLoading(false);
         return;
       }
 
       if (!postResult.ok) {
-        setIsError(true);
-        setMessage(postResult.data?.error || "Không tải được bài viết");
+        showPopup("error", getBackendMessage(postResult.data, "Không tải được bài viết"));
         setLoading(false);
         return;
       }
@@ -177,8 +213,7 @@ export default function PostUpdatePage() {
         content: post?.content || "",
       });
     } catch (error) {
-      setIsError(true);
-      setMessage("Có lỗi xảy ra khi tải dữ liệu bài viết");
+      showPopup("error", "Có lỗi xảy ra khi tải dữ liệu bài viết");
     } finally {
       setLoading(false);
     }
@@ -251,12 +286,10 @@ export default function PostUpdatePage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("");
-    setIsError(false);
+    setRedirectToastId(null);
 
     if (!selectedSubcategoryId) {
-      setIsError(true);
-      setMessage("Vui lòng chọn subcategory trước khi cập nhật bài viết");
+      showPopup("error", "Vui lòng chọn subcategory trước khi cập nhật bài viết");
       return;
     }
 
@@ -274,14 +307,16 @@ export default function PostUpdatePage() {
       const result = await updatePostApi(id, payload);
 
       if (!result.ok) {
-        setIsError(true);
-        setMessage(result.data?.error || "Cập nhật bài viết thất bại");
+        showPopup("error", getBackendMessage(result.data, "Cập nhật bài viết thất bại"));
         setSubmitting(false);
         return;
       }
 
-      setIsError(false);
-      setMessage(result.data?.message || "Cập nhật bài viết thành công");
+      const successToastId = showPopup(
+        "success",
+        getBackendMessage(result.data, "Cập nhật bài viết thành công")
+      );
+      setRedirectToastId(successToastId);
 
       const updatedPost = result.data?.post;
       if (updatedPost) {
@@ -306,8 +341,7 @@ export default function PostUpdatePage() {
         });
       }
     } catch (error) {
-      setIsError(true);
-      setMessage("Có lỗi xảy ra khi cập nhật bài viết");
+      showPopup("error", "Có lỗi xảy ra khi cập nhật bài viết");
     } finally {
       setSubmitting(false);
     }
@@ -341,18 +375,6 @@ export default function PostUpdatePage() {
           </p>
         </div>
       </div>
-
-      {message && (
-        <div
-          className={`relative mb-6 rounded-xl border px-4 py-3 text-sm ${
-            isError
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="relative space-y-6">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
@@ -433,68 +455,68 @@ export default function PostUpdatePage() {
             <div className="grid gap-5 md:grid-cols-3">
               <div>
                 <label
-  htmlFor="status"
-  className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700"
->
-  Trạng thái
+                  htmlFor="status"
+                  className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700"
+                >
+                  Trạng thái
 
-  <button
-    type="button"
-    onClick={() => setIsStatusUnlocked((prev) => !prev)}
-    title={isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"}
-    aria-label={isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"}
-    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
-      isStatusUnlocked
-        ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
-        : "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200"
-    }`}
-  >
-    {isStatusUnlocked ? (
-      // unlock icon
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="h-4 w-4"
-      >
-        <rect x="5" y="11" width="14" height="10" rx="2" />
-        <path d="M8 11V8a4 4 0 1 1 8 0" />
-      </svg>
-    ) : (
-      // lock icon
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        className="h-4 w-4"
-      >
-        <rect x="5" y="11" width="14" height="10" rx="2" />
-        <path d="M8 11V8a4 4 0 1 1 8 0v3" />
-      </svg>
-    )}
-  </button>
-</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsStatusUnlocked((prev) => !prev)}
+                    title={isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"}
+                    aria-label={isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                      isStatusUnlocked
+                        ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
+                        : "border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {isStatusUnlocked ? (
+                      // unlock icon
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="h-4 w-4"
+                      >
+                        <rect x="5" y="11" width="14" height="10" rx="2" />
+                        <path d="M8 11V8a4 4 0 1 1 8 0" />
+                      </svg>
+                    ) : (
+                      // lock icon
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="h-4 w-4"
+                      >
+                        <rect x="5" y="11" width="14" height="10" rx="2" />
+                        <path d="M8 11V8a4 4 0 1 1 8 0v3" />
+                      </svg>
+                    )}
+                  </button>
+                </label>
 
-<select
-  id="status"
-  name="status"
-  value={form.status ? "active" : "inactive"}
-  onChange={(e) =>
-    setForm((prev) => ({
-      ...prev,
-      status: e.target.value === "active",
-    }))
-  }
-  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-70"
-  disabled={!isStatusUnlocked}
->
-  <option value="active">Đăng ngay</option>
-  <option value="inactive">Lưu nháp</option>
-</select>
+                <select
+                  id="status"
+                  name="status"
+                  value={form.status ? "active" : "inactive"}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      status: e.target.value === "active",
+                    }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-100 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={!isStatusUnlocked}
+                >
+                  <option value="active">Đăng ngay</option>
+                  <option value="inactive">Lưu nháp</option>
+                </select>
               </div>
 
               <div>
@@ -730,6 +752,8 @@ export default function PostUpdatePage() {
           </button>
         </div>
       </form>
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </section>
   );
 }

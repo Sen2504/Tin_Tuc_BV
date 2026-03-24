@@ -83,6 +83,27 @@ export async function updatePostApi(postId, payload) {
   }
 }
 
+export async function deletePostApi(postId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
 // API dùng chung cho cả giao diện người dùng và quản trị
 export async function getPostsApi(options = {}) {
   const params = new URLSearchParams();

@@ -1,5 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from app.extensions import db
+
+VN_TZ = timezone(timedelta(hours=7))
+
+def vn_now():
+    return datetime.now(VN_TZ)
+
 
 class Media(db.Model):
     __tablename__ = "media"
@@ -15,7 +21,7 @@ class Media(db.Model):
 
     file_size = db.Column(db.BigInteger)
 
-    upload_at = db.Column(db.DateTime, default=datetime.utcnow)
+    upload_at = db.Column(db.DateTime, default=vn_now)
 
     caption = db.Column(db.String(500))
 

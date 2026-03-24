@@ -28,6 +28,20 @@ export async function updateUserApi(userId, payload) {
   return { ok: res.ok, data };
 }
 
+export async function updateMyProfileApi(payload) {
+  const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  return { ok: res.ok, data };
+}
+
 export async function getUsersApi() {
   const res = await fetch(`${API_BASE_URL}/api/users`, {
     method: "GET",

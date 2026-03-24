@@ -1,9 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { getCategoriesApi } from "@/api/categoryApi";
 import { createSubCategoryApi } from "@/api/subcategoryApi";
+import ToastStack from "@/components/ToastStack";
 import { toSlugPreview } from "@/utils/slugPreview";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 export default function SubCategoryCreatePage() {
   const navigate = useNavigate();
@@ -18,10 +33,25 @@ export default function SubCategoryCreatePage() {
     thumbnail: null,
   });
 
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [toasts, setToasts] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   const slugPreview = useMemo(() => toSlugPreview(form.name), [form.name]);
 
@@ -44,13 +74,11 @@ export default function SubCategoryCreatePage() {
 
   async function loadCategories() {
     setLoadingCategories(true);
-    setMessage("");
 
     const result = await getCategoriesApi();
 
     if (!result.ok) {
-      setIsError(true);
-      setMessage(result.data?.error || "Không tải được category");
+      showPopup("error", getBackendMessage(result.data, "Không tải được category"));
       setLoadingCategories(false);
       return;
     }
@@ -85,20 +113,6 @@ export default function SubCategoryCreatePage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("");
-    setIsError(false);
-
-    if (!form.name.trim()) {
-      setIsError(true);
-      setMessage("Tên danh mục con là bắt buộc");
-      return;
-    }
-
-    if (!form.category_id) {
-      setIsError(true);
-      setMessage("Vui lòng chọn category");
-      return;
-    }
 
     setSubmitting(true);
 
@@ -113,16 +127,16 @@ export default function SubCategoryCreatePage() {
     const result = await createSubCategoryApi(payload);
 
     if (!result.ok) {
-      setIsError(true);
-      setMessage(result.data?.error || "Tạo danh mục con thất bại");
+      showPopup("error", getBackendMessage(result.data, "Tạo danh mục con thất bại"));
       setSubmitting(false);
       return;
     }
 
-    setIsError(false);
-    setMessage(result.data?.message || "Tạo danh mục con thành công");
+    showPopup("success", getBackendMessage(result.data, "Tạo danh mục con thành công"));
 
-    navigate("/subcategory/list");
+    setTimeout(() => {
+      navigate("/subcategory/list");
+    }, 2000);
   }
 
   return (
@@ -141,18 +155,6 @@ export default function SubCategoryCreatePage() {
           </p>
         </div>
       </div>
-
-      {message && (
-        <div
-          className={`relative mb-6 rounded-xl border px-4 py-3 text-sm ${
-            isError
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="relative space-y-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -370,6 +372,8 @@ export default function SubCategoryCreatePage() {
           </button>
         </div>
       </form>
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </section>
   );
 }

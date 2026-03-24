@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -6,17 +6,31 @@ import {
   getSubCategoryByIdApi,
 } from "@/api/subcategoryApi";
 import { getCategoriesApi } from "@/api/categoryApi";
+import ToastStack from "@/components/ToastStack";
 import { toSlugPreview } from "@/utils/slugPreview";
 
 const API_ORIGIN = "http://localhost:5000";
+
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
 
 export default function SubCategoryUpdatePage() {
   const navigate = useNavigate();
   const { id } = useParams();
 
   const [categories, setCategories] = useState([]);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [toasts, setToasts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +53,22 @@ export default function SubCategoryUpdatePage() {
     return URL.createObjectURL(form.thumbnail);
   }, [form.thumbnail]);
 
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -58,20 +88,20 @@ export default function SubCategoryUpdatePage() {
   async function loadCategories() {
     try {
       setLoadingCategories(true);
-      setMessage("");
 
       const result = await getCategoriesApi();
 
       if (!result.ok) {
-        setIsError(true);
-        setMessage(result.data?.error || "Không tải được danh sách category");
+        showPopup(
+          "error",
+          getBackendMessage(result.data, "Không tải được danh sách category")
+        );
         return;
       }
 
       setCategories(result.data?.categories || []);
     } catch {
-      setIsError(true);
-      setMessage("Không tải được danh sách category");
+      showPopup("error", "Không tải được danh sách category");
     } finally {
       setLoadingCategories(false);
     }
@@ -80,14 +110,14 @@ export default function SubCategoryUpdatePage() {
   async function loadSubCategory() {
     try {
       setLoading(true);
-      setMessage("");
-      setIsError(false);
 
       const result = await getSubCategoryByIdApi(id);
 
       if (!result.ok) {
-        setIsError(true);
-        setMessage(result.data?.error || "Không tải được thông tin subcategory");
+        showPopup(
+          "error",
+          getBackendMessage(result.data, "Không tải được thông tin subcategory")
+        );
         return;
       }
 
@@ -106,8 +136,7 @@ export default function SubCategoryUpdatePage() {
 
       setCurrentThumbnail(subcategory.thumbnail || null);
     } catch {
-      setIsError(true);
-      setMessage("Không tải được thông tin subcategory");
+      showPopup("error", "Không tải được thông tin subcategory");
     } finally {
       setLoading(false);
     }
@@ -153,20 +182,6 @@ export default function SubCategoryUpdatePage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("");
-    setIsError(false);
-
-    if (!form.name.trim()) {
-      setIsError(true);
-      setMessage("Tên danh mục con là bắt buộc");
-      return;
-    }
-
-    if (!form.category_id) {
-      setIsError(true);
-      setMessage("Vui lòng chọn category");
-      return;
-    }
 
     try {
       setSubmitting(true);
@@ -181,15 +196,17 @@ export default function SubCategoryUpdatePage() {
       });
 
       if (!result.ok) {
-        setIsError(true);
-        setMessage(result.data?.error || "Cập nhật subcategory thất bại");
+        showPopup("error", getBackendMessage(result.data, "Cập nhật subcategory thất bại"));
         return;
       }
 
-      navigate("/subcategory/list");
+      showPopup("success", getBackendMessage(result.data, "Cập nhật subcategory thành công"));
+
+      setTimeout(() => {
+        navigate("/subcategory/list");
+      }, 2000);
     } catch {
-      setIsError(true);
-      setMessage("Có lỗi xảy ra khi cập nhật subcategory");
+      showPopup("error", "Có lỗi xảy ra khi cập nhật subcategory");
     } finally {
       setSubmitting(false);
     }
@@ -211,18 +228,6 @@ export default function SubCategoryUpdatePage() {
           </p>
         </div>
       </div>
-
-      {message && (
-        <div
-          className={`relative mb-6 rounded-xl border px-4 py-3 text-sm ${
-            isError
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="relative space-y-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -476,6 +481,8 @@ export default function SubCategoryUpdatePage() {
           </button>
         </div>
       </form>
+
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </section>
   );
 }

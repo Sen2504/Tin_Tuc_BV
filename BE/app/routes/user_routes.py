@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, url_for
+from flask_login import current_user, login_required
 from marshmallow import ValidationError
 
 from app.services.user_service import UserService
@@ -27,11 +28,15 @@ def create_user():
     except ValidationError as err:
         return jsonify({"errors": err.messages}), 400
 
+    requested_role = (valid_data.get("role") or "staff").strip().lower()
+    has_admin = UserService.has_admin_account()
+    final_role = "staff" if has_admin else requested_role
+
     user, token, error = UserService.create_user(
         username=valid_data["username"],
         email=valid_data["email"],
         password=valid_data["password"],
-        role=valid_data.get("role", "staff"),
+        role=final_role,
         is_active=valid_data.get("is_active", True),
     )
 
@@ -51,8 +56,12 @@ def create_user():
 
     send_email("Xác nhận tài khoản", [user.email], html)
 
+    message = "user created successfully"
+    if has_admin and requested_role == "admin":
+        message = "admin account already exists, new user was created with staff role"
+
     return jsonify({
-        "message": "user created successfully",
+        "message": message,
         "user": user_response_schema.dump(user)
     }), 201
 
@@ -67,13 +76,51 @@ def update_user(user_id):
     except ValidationError as err:
         return jsonify({"errors": err.messages}), 400
 
-    user, error = UserService.update_user(user_id, valid_data)
+    user, error = UserService.update_user(user_id, valid_data, actor=current_user)
     if error:
-        status = 404 if error == "user not found" else 409 if "exists" in error else 400
+        status = (
+            404 if error == "user not found"
+            else 403 if error == "permission denied"
+            else 409 if "exists" in error
+            else 400
+        )
         return jsonify({"error": error}), status
 
     return jsonify({
         "message": "user updated successfully",
+        "user": user_response_schema.dump(user)
+    }), 200
+
+
+@user_bp.route("/me", methods=["PUT"])
+@login_required
+def update_my_profile():
+    data = request.get_json(silent=True) or {}
+
+    try:
+        valid_data = update_user_schema.load(data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+
+    allowed_fields = {"username", "email", "password"}
+    profile_data = {
+        key: value
+        for key, value in valid_data.items()
+        if key in allowed_fields
+    }
+
+    user, error = UserService.update_user(current_user.id, profile_data, actor=current_user)
+    if error:
+        status = (
+            404 if error == "user not found"
+            else 403 if error == "permission denied"
+            else 409 if "exists" in error
+            else 400
+        )
+        return jsonify({"error": error}), status
+
+    return jsonify({
+        "message": "profile updated successfully",
         "user": user_response_schema.dump(user)
     }), 200
 
@@ -83,5 +130,12 @@ def list_users():
     users = UserService.get_users()
 
     return jsonify({
-        "users": user_response_schema.dump(users, many=True)
+        "users": user_response_schema.dump(users, many=True),
+        "current_user": {
+            "id": current_user.id,
+            "username": current_user.username,
+            "email": current_user.email,
+            "role": current_user.role,
+            "is_active": current_user.is_active,
+        },
     }), 200

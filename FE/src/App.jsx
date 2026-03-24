@@ -7,6 +7,8 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminLayout from "./layouts/AdminLayout";
 import UserListPage from "./pages/adminPage/UserListPage";
 import UserCreatePage from "./pages/adminPage/UserCreatePage";
+import UserEditPage from "./pages/adminPage/UserEditPage";
+import UserSelfUpdatePage from "./pages/adminPage/UserSelfUpdatePage";
 import CategoryListPage from "./pages/adminPage/CategoryListPage";
 import CategoryCreatePage from "./pages/adminPage/CategoryCreatePage";
 import CategoryUpdatePage from "./pages/adminPage/CategoryUpdatePage";
@@ -19,6 +21,7 @@ import SubCategoryPage from "./pages/clientPage/SubCategoryPage";
 import PostPage from "./pages/clientPage/PostPage";
 import PostListPage from "./pages/adminPage/PostListPage";
 import PostUpdatePage from "./pages/adminPage/PostUpdatePage";
+import AdminOnlyRoute from "./components/AdminOnlyRoute";
 
 export default function App() {
   return (
@@ -38,8 +41,14 @@ export default function App() {
         {/* Các trang có dùng AdminLayout */}
         <Route element={<AdminLayout />}>
           <Route path="/dashboard" element={<div />} />
-          <Route path="/user/list" element={<UserListPage />} />
-          <Route path="/user/create" element={<UserCreatePage />} />
+          <Route path="/user/update" element={<UserSelfUpdatePage />} />
+
+          <Route element={<AdminOnlyRoute />}>
+            <Route path="/user/list" element={<UserListPage />} />
+            <Route path="/user/create" element={<UserCreatePage />} />
+            <Route path="/user/edit/:id" element={<UserEditPage />} />
+            <Route path="/user/update/:id" element={<UserEditPage />} />
+          </Route>
 
           <Route path="/category/list" element={<CategoryListPage />} />
           <Route path="/category/create" element={<CategoryCreatePage />} />

@@ -50,7 +50,7 @@ export default function Footer() {
             {/* Cột 1 – Thương hiệu */}
             <div className="flex flex-col gap-5">
               <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-sky-500 bg-white shadow-md">
+                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 border-sky-500 bg-white shadow-md">
                   <img src={logo} alt="Logo" className="h-full w-full object-contain" />
                 </div>
                 <div>

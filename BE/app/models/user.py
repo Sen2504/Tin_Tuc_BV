@@ -1,7 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app.extensions import db
+
+VN_TZ = timezone(timedelta(hours=7))
+
+def vn_now():
+    return datetime.now(VN_TZ)
+
 
 
 class User(db.Model, UserMixin):
@@ -22,7 +28,7 @@ class User(db.Model, UserMixin):
     confirmed = db.Column(db.Boolean, nullable=False, default=False)
     confirmed_at = db.Column(db.DateTime, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=vn_now)
 
     posts = db.relationship(
         "Post",

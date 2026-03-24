@@ -1,5 +1,6 @@
 import re
 from email_validator import validate_email, EmailNotValidError
+from sqlalchemy import func
 
 from app.extensions import db
 from app.models.user import User
@@ -7,6 +8,23 @@ from app.utils.tokens import generate_confirmation_token
 
 
 class UserService:
+    @staticmethod
+    def _is_admin_role(value):
+        return (value or "").strip().lower() == User.ROLE_ADMIN
+
+    @staticmethod
+    def _find_other_admin(exclude_user_id=None):
+        query = User.query.filter(func.lower(User.role) == User.ROLE_ADMIN)
+
+        if exclude_user_id is not None:
+            query = query.filter(User.id != exclude_user_id)
+
+        return query.first()
+
+    @staticmethod
+    def has_admin_account():
+        return UserService._find_other_admin() is not None
+
     @staticmethod
     def create_user(username, email, password, role="staff", is_active=True):
         username = (username or "").strip()
@@ -16,6 +34,9 @@ class UserService:
         if not username:
             return None, None, "username is required"
 
+        if len(username) > 255:
+            return None, None, "username must not exceed 255 characters"
+
         if not email:
             return None, None, "email is required"
 
@@ -24,6 +45,9 @@ class UserService:
 
         if role not in [User.ROLE_ADMIN, User.ROLE_STAFF]:
             return None, None, "role must be admin or staff"
+
+        if role == User.ROLE_ADMIN and UserService._find_other_admin():
+            return None, None, "admin account already exists in the system"
 
         try:
             validate_email(email)
@@ -59,15 +83,22 @@ class UserService:
         return user, token, None
 
     @staticmethod
-    def update_user(user_id, data: dict):
+    def update_user(user_id, data: dict, actor=None):
         user = User.query.get(user_id)
         if not user:
             return None, "user not found"
 
+        if actor and (not actor.is_admin()) and actor.id != user.id:
+            return None, "permission denied"
+
         if "username" in data:
             username = (data.get("username") or "").strip()
+
             if not username:
                 return None, "username cannot be empty"
+
+            if len(username) > 255:
+                return None, "username must not exceed 255 characters"
 
             existed = User.query.filter_by(username=username).first()
             if existed and existed.id != user.id:
@@ -106,10 +137,28 @@ class UserService:
             role = (data.get("role") or "").strip().lower()
             if role not in [User.ROLE_ADMIN, User.ROLE_STAFF]:
                 return None, "role must be admin or staff"
+
+            if actor and (not actor.is_admin()) and role != user.role:
+                return None, "permission denied"
+
+            if role == User.ROLE_ADMIN and UserService._find_other_admin(exclude_user_id=user.id):
+                return None, "admin account already exists in the system"
+
+            if UserService._is_admin_role(user.role) and role != User.ROLE_ADMIN:
+                return None, "admin role cannot be changed"
+
             user.role = role
 
         if "is_active" in data:
-            user.is_active = bool(data.get("is_active"))
+            next_active = bool(data.get("is_active"))
+
+            if UserService._is_admin_role(user.role) and not next_active:
+                return None, "admin account cannot be set to inactive"
+
+            if (not user.is_active) and next_active:
+                return None, "inactive user cannot be reactivated"
+
+            user.is_active = next_active
 
         db.session.commit()
         return user, None

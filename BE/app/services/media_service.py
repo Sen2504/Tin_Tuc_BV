@@ -29,7 +29,8 @@ class MediaService:
         if not MediaService._allowed_image(file_storage.filename):
             return None, "Chỉ cho phép upload ảnh jpg, jpeg, png, webp, gif"
 
-        upload_folder = current_app.config["UPLOAD_FOLDER"]
+        base_upload_folder = current_app.config["UPLOAD_FOLDER"]
+        upload_folder = os.path.join(base_upload_folder, "post")
         os.makedirs(upload_folder, exist_ok=True)
 
         original_name = file_storage.filename
@@ -46,7 +47,7 @@ class MediaService:
             media = Media(
                 original_name=original_name,
                 file_name=file_name,
-                file_path=abs_path,
+                file_path = f"post/{file_name}",
                 mime_type=file_storage.mimetype,
                 file_size=file_size,
             )
@@ -54,7 +55,8 @@ class MediaService:
             db.session.add(media)
             db.session.commit()
 
-            file_url = url_for("media.get_uploaded_file", filename=file_name, _external=True)
+            relative_path = f"post/{file_name}"
+            file_url = url_for("media.get_uploaded_file", filename=relative_path, _external=True)
 
             return {
                 "media_id": media.id,

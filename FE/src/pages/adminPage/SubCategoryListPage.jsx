@@ -24,6 +24,7 @@ function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
 
 export default function SubCategoryListPage() {
   const navigate = useNavigate();
+  const ITEMS_PER_PAGE = 5;
 
   const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +33,7 @@ export default function SubCategoryListPage() {
   const [parentFilter, setParentFilter] = useState("all");
   const [updatingIds, setUpdatingIds] = useState([]);
   const [deletingIds, setDeletingIds] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState(null);
@@ -81,6 +83,7 @@ export default function SubCategoryListPage() {
     setParentFilter("all");
     setStatusFilter("all");
     setSearchTerm("");
+    setCurrentPage(1);
   }
 
   function handleOpenConfirm(subcategory, nextValue) {
@@ -229,6 +232,27 @@ export default function SubCategoryListPage() {
     });
   }, [subcategories, searchTerm, statusFilter, parentFilter]);
 
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredSubcategories.length / ITEMS_PER_PAGE)
+  );
+
+  const paginatedSubcategories = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredSubcategories.slice(startIndex, endIndex);
+  }, [filteredSubcategories, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, parentFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const totalCount = subcategories.length;
   const activeCount = subcategories.filter((sub) => sub.status).length;
   const hiddenCount = totalCount - activeCount;
@@ -333,7 +357,7 @@ export default function SubCategoryListPage() {
                   <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
                     Danh mục cha
                   </th>
-                  <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
+                  <th className="px-5 py-4 text-center text-[11px] font-bold uppercase text-zinc-500">
                     Số lượng bài viết
                   </th>
                   <th className="px-5 py-4 text-left text-[11px] font-bold uppercase text-zinc-500">
@@ -359,78 +383,78 @@ export default function SubCategoryListPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredSubcategories.map((sub) => {
+                  paginatedSubcategories.map((sub) => {
                     const isUpdating = updatingIds.includes(sub.id);
                     const isDeleting = deletingIds.includes(sub.id);
 
                     return (
-                    <tr key={sub.id} className="transition hover:bg-orange-50/40">
-                      <td className="px-5 py-4 align-top">
-                        <div className="flex items-start gap-4">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-rose-500 text-sm font-black uppercase text-white shadow-lg shadow-orange-500/20">
-                            {sub.name?.slice(0, 1) || "S"}
+                      <tr key={sub.id} className="transition hover:bg-orange-50/40">
+                        <td className="px-5 py-4 align-top">
+                          <div className="flex items-start gap-4">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-rose-500 text-sm font-black uppercase text-white shadow-lg shadow-orange-500/20">
+                              {sub.name?.slice(0, 1) || "S"}
+                            </div>
+
+                            <div>
+                              <p className="text-sm font-bold text-zinc-900">{sub.name}</p>
+                              {/* <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
+                                ID: {sub.id}
+                              </p> */}
+                            </div>
                           </div>
+                        </td>
 
-                          <div>
-                            <p className="text-sm font-bold text-zinc-900">{sub.name}</p>
-                            {/* <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-400">
-                              ID: {sub.id}
-                            </p> */}
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-xs font-medium text-zinc-700">{sub.category_name || "N/A"}</p>
+                        </td>
+
+                        <td className="px-5 py-4 text-center align-top">
+                          <p className="text-sm font-bold text-zinc-800">{sub.posts_count ?? 0}</p>
+                        </td>
+
+                        <td className="px-5 py-4 align-top">
+                          <select
+                            value={sub.status ? "active" : "inactive"}
+                            onChange={(event) =>
+                              handleOpenConfirm(sub, event.target.value)
+                            }
+                            disabled={isUpdating || isDeleting}
+                            className={`w-[122px] rounded-xl border px-3 py-2 text-[12px] font-semibold outline-none transition ${
+                              sub.status
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                            } ${
+                              isUpdating || isDeleting
+                                ? "cursor-not-allowed opacity-70"
+                                : "focus:border-cyan-400"
+                            }`}
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </td>
+
+                        <td className="px-5 py-4 align-top text-left">
+                          <div className="flex justify-start gap-2">
+                            <button
+                              onClick={() => navigate(`/subcategory/update/${sub.id}`)}
+                              disabled={isDeleting}
+                              className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              Sửa
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDeleteModal(sub)}
+                              disabled={isDeleting}
+                              className="inline-flex items-center justify-center rounded-xl bg-red-500 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {isDeleting ? "Đang xóa..." : "Xóa"}
+                            </button>
                           </div>
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-xs font-medium text-zinc-700">{sub.category_name || "N/A"}</p>
-                      </td>
-
-                      <td className="px-5 py-4 align-top">
-                        <p className="text-sm font-bold text-zinc-800">{sub.posts_count ?? 0}</p>
-                      </td>
-
-                      <td className="px-5 py-4 align-top">
-                        <select
-                          value={sub.status ? "active" : "inactive"}
-                          onChange={(event) =>
-                            handleOpenConfirm(sub, event.target.value)
-                          }
-                          disabled={isUpdating || isDeleting}
-                          className={`w-[122px] rounded-xl border px-3 py-2 text-[12px] font-semibold outline-none transition ${
-                            sub.status
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-rose-200 bg-rose-50 text-rose-700"
-                          } ${
-                            isUpdating || isDeleting
-                              ? "cursor-not-allowed opacity-70"
-                              : "focus:border-orange-400"
-                          }`}
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-                      </td>
-
-                      <td className="w-[220px] px-5 py-4 align-top text-left">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => navigate(`/subcategory/update/${sub.id}`)}
-                            disabled={isDeleting}
-                            className="inline-flex items-center justify-center rounded-2xl border border-zinc-200 px-4 py-2.5 text-sm font-bold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            Sửa
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDeleteModal(sub)}
-                            disabled={isDeleting}
-                            className="inline-flex items-center justify-center rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            {isDeleting ? "Đang xóa..." : "Xóa"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
@@ -439,10 +463,46 @@ export default function SubCategoryListPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-2 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>
-            Đang hiển thị {filteredSubcategories.length} / {totalCount} sub category
-          </p>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Trước
+            </button>
+
+            {Array.from({ length: totalPages }, (_, index) => {
+              const page = index + 1;
+              const isActive = page === currentPage;
+
+              return (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                    isActive
+                      ? "bg-orange-500 text-white"
+                      : "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50"
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </div>
 
