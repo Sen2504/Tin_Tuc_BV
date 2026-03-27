@@ -47,7 +47,7 @@ class MediaService:
             media = Media(
                 original_name=original_name,
                 file_name=file_name,
-                file_path = f"post/{file_name}",
+                file_path = f"uploads/post/{file_name}",
                 mime_type=file_storage.mimetype,
                 file_size=file_size,
             )

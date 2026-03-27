@@ -22,6 +22,12 @@ import PostPage from "./pages/clientPage/PostPage";
 import PostListPage from "./pages/adminPage/PostListPage";
 import PostUpdatePage from "./pages/adminPage/PostUpdatePage";
 import AdminOnlyRoute from "./components/AdminOnlyRoute";
+import InfoCreatePage from "./pages/adminPage/InfoCreatePage";
+import InfoListPage from "./pages/adminPage/InfoListPage";
+import InfoUpdatePage from "./pages/adminPage/InfoUpdatePage";
+import BannerCreatePage from "./pages/adminPage/BannerCreatePage";
+import BannerListPage from "./pages/adminPage/BannerListPage";
+import BannerUpdatePage from "./pages/adminPage/BannerUpdatePage";
 
 export default function App() {
   return (
@@ -61,7 +67,14 @@ export default function App() {
           <Route path="/post/create" element={<CreatePostPage />} />
           <Route path="/post/list" element={<PostListPage />} />
           <Route path="/post/update/:id" element={<PostUpdatePage />} />
+          
+          <Route path="/info/create" element={<InfoCreatePage />} />
+          <Route path="/info/list" element={<InfoListPage />} />
+          <Route path="/info/update/:id" element={<InfoUpdatePage />} /> 
 
+          <Route path="/banner/list" element={<BannerListPage />} />
+          <Route path="/banner/create" element={<BannerCreatePage />} /> 
+          <Route path="/banner/update/:id" element={<BannerUpdatePage />} />
         </Route>
 
         {/* Trang login để riêng, thường không cần header/footer */}

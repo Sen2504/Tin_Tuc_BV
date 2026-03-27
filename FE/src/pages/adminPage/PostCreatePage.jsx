@@ -41,6 +41,8 @@ export default function CreatePostPage() {
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [hashtagInput, setHashtagInput] = useState("");
   const [hashtags, setHashtags] = useState([]);
+  const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState("");
 
   const [form, setForm] = useState({
     title: "",
@@ -48,6 +50,7 @@ export default function CreatePostPage() {
     status: true,
     content: "",
   });
+
   const [toasts, setToasts] = useState([]);
   const [redirectToastId, setRedirectToastId] = useState(null);
 
@@ -67,14 +70,17 @@ export default function CreatePostPage() {
     return toastId;
   }, []);
 
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  const removeToast = useCallback(
+    (id) => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
 
-    if (id === redirectToastId) {
-      setRedirectToastId(null);
-      navigate("/post/list");
-    }
-  }, [navigate, redirectToastId]);
+      if (id === redirectToastId) {
+        setRedirectToastId(null);
+        navigate("/post/list");
+      }
+    },
+    [navigate, redirectToastId]
+  );
 
   const slugPreview = useMemo(() => toSlugPreview(form.title), [form.title]);
 
@@ -85,6 +91,14 @@ export default function CreatePostPage() {
   useEffect(() => {
     setHashtags(parseHashtagString(form.hashtag));
   }, [form.hashtag]);
+
+  useEffect(() => {
+    return () => {
+      if (thumbnailPreview) {
+        URL.revokeObjectURL(thumbnailPreview);
+      }
+    };
+  }, [thumbnailPreview]);
 
   async function loadCategories() {
     const result = await getCategoriesApi();
@@ -173,6 +187,45 @@ export default function CreatePostPage() {
     });
   }
 
+  function handleThumbnailChange(event) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      if (thumbnailPreview) {
+        URL.revokeObjectURL(thumbnailPreview);
+      }
+      setThumbnailFile(null);
+      setThumbnailPreview("");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      showPopup("error", "Vui lòng chọn file ảnh hợp lệ");
+      event.target.value = "";
+      return;
+    }
+
+    if (thumbnailPreview) {
+      URL.revokeObjectURL(thumbnailPreview);
+    }
+
+    setThumbnailFile(file);
+    setThumbnailPreview(URL.createObjectURL(file));
+  }
+
+  function handleRemoveThumbnail() {
+    if (thumbnailPreview) {
+      URL.revokeObjectURL(thumbnailPreview);
+    }
+
+    setThumbnailFile(null);
+    setThumbnailPreview("");
+    const input = document.getElementById("thumbnail");
+    if (input) {
+      input.value = "";
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setRedirectToastId(null);
@@ -182,15 +235,18 @@ export default function CreatePostPage() {
       return;
     }
 
-    const payload = {
-      title: form.title,
-      hashtag: form.hashtag,
-      status: form.status,
-      content: form.content,
-      subcategory_id: Number(selectedSubcategoryId),
-    };
+    const formData = new FormData();
+    formData.append("title", form.title);
+    formData.append("hashtag", form.hashtag || "");
+    formData.append("status", String(form.status));
+    formData.append("content", form.content);
+    formData.append("subcategory_id", String(Number(selectedSubcategoryId)));
 
-    const result = await createPostApi(payload);
+    if (thumbnailFile) {
+      formData.append("thumbnail", thumbnailFile);
+    }
+    
+    const result = await createPostApi(formData);
 
     if (!result.ok) {
       showPopup("error", getBackendMessage(result.data, "Tạo bài viết thất bại"));
@@ -303,10 +359,16 @@ export default function CreatePostPage() {
             </p>
             <div className="mt-2 space-y-1 text-sm text-slate-700">
               <p>
-                Category: <span className="font-semibold text-slate-900">{selectedCategory?.name || "Chưa chọn"}</span>
+                Category:{" "}
+                <span className="font-semibold text-slate-900">
+                  {selectedCategory?.name || "Chưa chọn"}
+                </span>
               </p>
               <p>
-                Subcategory: <span className="font-semibold text-slate-900">{selectedSubcategory?.name || "Chưa chọn"}</span>
+                Subcategory:{" "}
+                <span className="font-semibold text-slate-900">
+                  {selectedSubcategory?.name || "Chưa chọn"}
+                </span>
               </p>
               <p>
                 Trạng thái:
@@ -353,6 +415,75 @@ export default function CreatePostPage() {
           </div>
 
           <div className="lg:col-span-12">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Thumbnail bài viết
+            </label>
+
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                <div className="flex-1">
+                  <label
+                    htmlFor="thumbnail"
+                    className="inline-flex cursor-pointer items-center rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-700"
+                  >
+                    Chọn ảnh thumbnail
+                  </label>
+
+                  <input
+                    id="thumbnail"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailChange}
+                    className="hidden"
+                  />
+
+                  <p className="mt-2 text-xs text-slate-500">
+                    Nên dùng ảnh ngang, rõ nội dung. Hỗ trợ jpg, jpeg, png, webp,
+                    gif.
+                  </p>
+
+                  {thumbnailFile && (
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                      <p>
+                        <span className="font-semibold">Tên file:</span>{" "}
+                        {thumbnailFile.name}
+                      </p>
+                      <p>
+                        <span className="font-semibold">Dung lượng:</span>{" "}
+                        {(thumbnailFile.size / 1024).toFixed(2)} KB
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={handleRemoveThumbnail}
+                        className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
+                      >
+                        Xóa thumbnail đã chọn
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-full lg:w-72">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    {thumbnailPreview ? (
+                      <img
+                        src={thumbnailPreview}
+                        alt="Thumbnail preview"
+                        className="h-44 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-44 items-center justify-center bg-slate-100 text-sm text-slate-400">
+                        Chưa có ảnh thumbnail
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-12">
             <label
               htmlFor="hashtag"
               className="mb-2 block text-sm font-semibold text-slate-700"
@@ -393,7 +524,8 @@ export default function CreatePostPage() {
               </div>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Mỗi lần nhấn phím space, hashtag sẽ tự chuẩn hóa slug và hiển thị dạng #ten-tag.
+              Mỗi lần nhấn phím space, hashtag sẽ tự chuẩn hóa slug và hiển thị
+              dạng #ten-tag.
             </p>
           </div>
 

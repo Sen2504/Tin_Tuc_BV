@@ -139,6 +139,7 @@ class PostUpdateSchema(Schema):
 
     status = fields.Raw(required=False)
     subcategory_id = fields.Raw(required=False)
+    remove_thumbnail = fields.Raw(required=False)
 
     @validates("title")
     def validate_title(self, value, **kwargs):
@@ -159,6 +160,17 @@ class PostUpdateSchema(Schema):
         parsed_value = parse_int(value, "subcategory_id")
         if parsed_value is not None and parsed_value <= 0:
             raise ValidationError("subcategory_id phải lớn hơn 0")
+
+    @validates("remove_thumbnail")
+    def validate_remove_thumbnail(self, value, **kwargs):
+        parse_bool(value)
+
+class PostThumbnailResponseSchema(Schema):
+    original_name = fields.String(allow_none=True)
+    file_name = fields.String(allow_none=True)
+    file_path = fields.String(allow_none=True)
+    mime_type = fields.String(allow_none=True)
+    file_size = fields.Integer(allow_none=True)
 
 
 class AuthorResponseSchema(Schema):
@@ -193,10 +205,23 @@ class PostResponseSchema(Schema):
     author = fields.Method("get_author")
     category = fields.Method("get_category")
     subcategory = fields.Method("get_subcategory")
+    thumbnail = fields.Method("get_thumbnail")
 
     # def get_excerpt(self, obj):
     #     plain_text = re.sub(r"<[^>]+>", "", obj.content or "").strip()
     #     return plain_text[:180]
+
+    def get_thumbnail(self, obj):
+        if not obj.thumbnail_path:
+            return None
+
+        return PostThumbnailResponseSchema().dump({
+            "original_name": obj.thumbnail_original_name,
+            "file_name": obj.thumbnail_file_name,
+            "file_path": obj.thumbnail_path,
+            "mime_type": obj.thumbnail_mime_type,
+            "file_size": obj.thumbnail_file_size,
+        })
 
     def get_create_at(self, obj):
         return obj.create_at.isoformat() if obj.create_at else None
@@ -227,6 +252,7 @@ class PostPublicListItemSchema(Schema):
     hashtag = fields.String(allow_none=True)
     create_at = fields.Method("get_create_at")
     author = fields.Method("get_author")
+    thumbnail = fields.Method("get_thumbnail")
 
     def get_create_at(self, obj):
         return obj.create_at.isoformat() if obj.create_at else None
@@ -235,6 +261,18 @@ class PostPublicListItemSchema(Schema):
         if not obj.author:
             return None
         return AuthorResponseSchema().dump(obj.author)
+    
+    def get_thumbnail(self, obj):
+        if not obj.thumbnail_path:
+            return None
+
+        return PostThumbnailResponseSchema().dump({
+            "original_name": obj.thumbnail_original_name,
+            "file_name": obj.thumbnail_file_name,
+            "file_path": obj.thumbnail_path,
+            "mime_type": obj.thumbnail_mime_type,
+            "file_size": obj.thumbnail_file_size,
+        })
 
 
 class PostPublicDetailSchema(Schema):
@@ -248,6 +286,7 @@ class PostPublicDetailSchema(Schema):
     author = fields.Method("get_author")
     category = fields.Method("get_category")
     subcategory = fields.Method("get_subcategory")
+    thumbnail = fields.Method("get_thumbnail")
 
     def get_create_at(self, obj):
         return obj.create_at.isoformat() if obj.create_at else None
@@ -269,3 +308,15 @@ class PostPublicDetailSchema(Schema):
         if not obj.subcategory:
             return None
         return SubcategoryBriefResponseSchema().dump(obj.subcategory)
+
+    def get_thumbnail(self, obj):
+        if not obj.thumbnail_path:
+            return None
+
+        return PostThumbnailResponseSchema().dump({
+            "original_name": obj.thumbnail_original_name,
+            "file_name": obj.thumbnail_file_name,
+            "file_path": obj.thumbnail_path,
+            "mime_type": obj.thumbnail_mime_type,
+            "file_size": obj.thumbnail_file_size,
+        })

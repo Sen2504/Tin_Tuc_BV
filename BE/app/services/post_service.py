@@ -10,6 +10,10 @@ from sqlalchemy.orm import joinedload
 import unicodedata
 import os
 from flask import current_app
+from uuid import uuid4
+from werkzeug.utils import secure_filename
+
+ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 
 def strip_html(value):
     if not value:
@@ -141,7 +145,74 @@ class PostService:
             db.session.delete(media)
 
     @staticmethod
-    def create_post(title, content, hashtag, status, subcategory_id, author_id):
+    def _allowed_image_file(filename):
+        if not filename or "." not in filename:
+            return False
+        ext = filename.rsplit(".", 1)[1].lower()
+        return ext in ALLOWED_IMAGE_EXTENSIONS
+
+    @staticmethod
+    def _delete_post_thumbnail_file(post):
+        if not post or not post.thumbnail_path:
+            return
+
+        try:
+            relative_path = post.thumbnail_path.lstrip("/\\")
+            absolute_path = os.path.join(current_app.root_path, relative_path)
+
+            if os.path.exists(absolute_path):
+                os.remove(absolute_path)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _clear_post_thumbnail(post):
+        PostService._delete_post_thumbnail_file(post)
+
+        post.thumbnail_original_name = None
+        post.thumbnail_file_name = None
+        post.thumbnail_path = None
+        post.thumbnail_mime_type = None
+        post.thumbnail_file_size = None
+
+    @staticmethod
+    def _save_post_thumbnail(file_storage):
+        if not file_storage or not file_storage.filename:
+            return None, "Thumbnail không hợp lệ"
+
+        if not PostService._allowed_image_file(file_storage.filename):
+            return None, "Thumbnail phải là file ảnh hợp lệ (jpg, jpeg, png, webp, gif)"
+
+        upload_folder = current_app.config.get("UPLOAD_FOLDER")
+        if not upload_folder:
+            return None, "UPLOAD_FOLDER chưa được cấu hình"
+
+        thumbnail_dir = os.path.join(upload_folder, "thumbnail_post")
+        os.makedirs(thumbnail_dir, exist_ok=True)
+
+        original_name = file_storage.filename
+        safe_name = secure_filename(original_name)
+        ext = safe_name.rsplit(".", 1)[1].lower()
+        file_name = f"{uuid4().hex}.{ext}"
+
+        absolute_path = os.path.join(thumbnail_dir, file_name)
+        file_storage.save(absolute_path)
+
+        relative_path = os.path.relpath(absolute_path, current_app.root_path)
+        relative_path = "/" + relative_path.replace("\\", "/")
+
+        thumbnail_data = {
+            "thumbnail_original_name": original_name,
+            "thumbnail_file_name": file_name,
+            "thumbnail_path": relative_path,
+            "thumbnail_mime_type": file_storage.mimetype,
+            "thumbnail_file_size": os.path.getsize(absolute_path),
+        }
+
+        return thumbnail_data, None
+
+    @staticmethod
+    def create_post(title, content, hashtag, status, subcategory_id, author_id, thumbnail_file=None):
         subcategory = (
             db.session.query(SubCategory)
             .join(Category, SubCategory.category_id == Category.id)
@@ -159,16 +230,29 @@ class PostService:
         media_ids = PostService._extract_media_ids_from_content(content)
         post_slug = generate_unique_post_slug(title, subcategory.id)
 
+        thumbnail_data = None
+        if thumbnail_file:
+            thumbnail_data, error = PostService._save_post_thumbnail(thumbnail_file)
+            if error:
+                return None, error
+
         try:
             post = Post(
                 title=title,
-                slug=post_slug,   # thêm dòng này
+                slug=post_slug,
                 content=content,
                 status=status,
                 hashtag=hashtag,
                 subcategory_id=subcategory.id,
                 user_id=author_id,
             )
+
+            if thumbnail_data:
+                post.thumbnail_original_name = thumbnail_data["thumbnail_original_name"]
+                post.thumbnail_file_name = thumbnail_data["thumbnail_file_name"]
+                post.thumbnail_path = thumbnail_data["thumbnail_path"]
+                post.thumbnail_mime_type = thumbnail_data["thumbnail_mime_type"]
+                post.thumbnail_file_size = thumbnail_data["thumbnail_file_size"]
 
             db.session.add(post)
             db.session.flush()
@@ -180,6 +264,10 @@ class PostService:
                 missing_ids = [mid for mid in media_ids if mid not in existing_ids]
                 if missing_ids:
                     db.session.rollback()
+
+                    if thumbnail_data and post.thumbnail_path:
+                        PostService._delete_post_thumbnail_file(post)
+
                     return None, f"Media không tồn tại: {missing_ids}"
 
                 for media_id in media_ids:
@@ -194,6 +282,12 @@ class PostService:
 
         except Exception as e:
             db.session.rollback()
+
+            if thumbnail_data and thumbnail_data.get("thumbnail_path"):
+                fake_post = type("FakePost", (), thumbnail_data)
+                fake_post.thumbnail_path = thumbnail_data["thumbnail_path"]
+                PostService._delete_post_thumbnail_file(fake_post)
+
             return None, str(e)
 
     @staticmethod
@@ -250,6 +344,13 @@ class PostService:
                         "id": post.author.id if post.author else None,
                         "username": post.author.username if post.author else None,
                     },
+                    "thumbnail": {
+                        "original_name": post.thumbnail_original_name,
+                        "file_name": post.thumbnail_file_name,
+                        "file_path": post.thumbnail_path,
+                        "mime_type": post.thumbnail_mime_type,
+                        "file_size": post.thumbnail_file_size,
+                    } if post.thumbnail_path else None,
                 }
                 for post in posts
             ]
@@ -304,6 +405,13 @@ class PostService:
                     "name": post.subcategory.name,
                     "slug": post.subcategory.slug,
                 },
+                "thumbnail": {
+                    "original_name": post.thumbnail_original_name,
+                    "file_name": post.thumbnail_file_name,
+                    "file_path": post.thumbnail_path,
+                    "mime_type": post.thumbnail_mime_type,
+                    "file_size": post.thumbnail_file_size,
+                } if post.thumbnail_path else None,
             }
         }
 
@@ -326,7 +434,11 @@ class PostService:
         return posts, None
 
     @staticmethod
-    def update_post(post_id, title=None, content=None, hashtag=None, status=None, subcategory_id=None):
+    def update_post(post_id, title=None, content=None, hashtag=None, status=None, 
+        subcategory_id=None,
+        thumbnail_file=None,
+        remove_thumbnail=False
+    ):
         post = (
             Post.query
             .options(
@@ -394,14 +506,30 @@ class PostService:
         old_media_ids = PostService._get_media_ids_of_post(post.id)
         new_media_ids = PostService._extract_media_ids_from_content(next_content)
 
+        new_thumbnail_data = None
+        if thumbnail_file:
+            new_thumbnail_data, error = PostService._save_post_thumbnail(thumbnail_file)
+            if error:
+                return None, error
+
+        old_thumbnail_path = post.thumbnail_path
+        old_thumbnail_original_name = post.thumbnail_original_name
+        old_thumbnail_file_name = post.thumbnail_file_name
+        old_thumbnail_mime_type = post.thumbnail_mime_type
+        old_thumbnail_file_size = post.thumbnail_file_size
+
         try:
-            # kiểm tra media mới có tồn tại không
             if new_media_ids:
                 medias = Media.query.filter(Media.id.in_(new_media_ids)).all()
                 existing_ids = {m.id for m in medias}
 
                 missing_ids = [mid for mid in new_media_ids if mid not in existing_ids]
                 if missing_ids:
+                    if new_thumbnail_data:
+                        fake_post = type("FakePost", (), {})()
+                        fake_post.thumbnail_path = new_thumbnail_data["thumbnail_path"]
+                        PostService._delete_post_thumbnail_file(fake_post)
+
                     return None, f"Media không tồn tại: {missing_ids}"
 
             post.title = next_title
@@ -411,10 +539,20 @@ class PostService:
             post.status = next_status
             post.subcategory = next_subcategory
 
-            # xóa toàn bộ link cũ
+            if remove_thumbnail:
+                PostService._clear_post_thumbnail(post)
+
+            if new_thumbnail_data:
+                PostService._clear_post_thumbnail(post)
+
+                post.thumbnail_original_name = new_thumbnail_data["thumbnail_original_name"]
+                post.thumbnail_file_name = new_thumbnail_data["thumbnail_file_name"]
+                post.thumbnail_path = new_thumbnail_data["thumbnail_path"]
+                post.thumbnail_mime_type = new_thumbnail_data["thumbnail_mime_type"]
+                post.thumbnail_file_size = new_thumbnail_data["thumbnail_file_size"]
+
             db.session.query(PostMedia).filter_by(post_id=post.id).delete()
 
-            # thêm link mới
             for media_id in new_media_ids:
                 db.session.add(PostMedia(
                     post_id=post.id,
@@ -433,6 +571,18 @@ class PostService:
 
         except Exception as e:
             db.session.rollback()
+
+            if new_thumbnail_data:
+                fake_post = type("FakePost", (), {})()
+                fake_post.thumbnail_path = new_thumbnail_data["thumbnail_path"]
+                PostService._delete_post_thumbnail_file(fake_post)
+
+            post.thumbnail_path = old_thumbnail_path
+            post.thumbnail_original_name = old_thumbnail_original_name
+            post.thumbnail_file_name = old_thumbnail_file_name
+            post.thumbnail_mime_type = old_thumbnail_mime_type
+            post.thumbnail_file_size = old_thumbnail_file_size
+
             return None, str(e)
         
     @staticmethod
@@ -462,6 +612,8 @@ class PostService:
         media_ids = PostService._get_media_ids_of_post(post.id)
 
         try:
+            PostService._delete_post_thumbnail_file(post)
+
             db.session.delete(post)
             db.session.flush()
 

@@ -5,6 +5,11 @@ import ToastStack from "@/components/ToastStack";
 import { getCategoriesApi } from "@/api/categoryApi";
 import { getPostByIdApi, updatePostApi } from "@/api/postApi";
 
+const API_ORIGIN =
+  import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, "") ||
+  import.meta.env.VITE_API_BASE_URL ||
+  "";
+
 function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
   if (data?.message) return data.message;
   if (data?.error) return data.error;
@@ -77,6 +82,12 @@ function formatHashtagValue(value = "") {
   return parseHashtags(value).join(" ");
 }
 
+function buildImageUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_ORIGIN}${path}`;
+}
+
 export default function PostUpdatePage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -96,6 +107,11 @@ export default function PostUpdatePage() {
   });
 
   const [postMeta, setPostMeta] = useState(null);
+
+  const [existingThumbnail, setExistingThumbnail] = useState(null);
+  const [newThumbnailFile, setNewThumbnailFile] = useState(null);
+  const [newThumbnailPreview, setNewThumbnailPreview] = useState("");
+  const [removeThumbnail, setRemoveThumbnail] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -119,17 +135,20 @@ export default function PostUpdatePage() {
     return toastId;
   }, []);
 
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  const removeToast = useCallback(
+    (id) => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
 
-    if (id === redirectToastId) {
-      setRedirectToastId(null);
-      navigate("/post/list");
-    }
-  }, [navigate, redirectToastId]);
+      if (id === redirectToastId) {
+        setRedirectToastId(null);
+        navigate("/post/list");
+      }
+    },
+    [navigate, redirectToastId]
+  );
 
   const slugPreview = useMemo(() => toSlugPreview(form.title), [form.title]);
-  
+
   const subcategories = useMemo(() => {
     const category = categories.find(
       (c) => String(c.id) === String(selectedCategoryId)
@@ -139,7 +158,8 @@ export default function PostUpdatePage() {
 
   const selectedCategoryName = useMemo(
     () =>
-      categories.find((c) => String(c.id) === String(selectedCategoryId))?.name ||
+      categories.find((c) => String(c.id) === String(selectedCategoryId))
+        ?.name ||
       postMeta?.category?.name ||
       "—",
     [categories, selectedCategoryId, postMeta]
@@ -160,9 +180,33 @@ export default function PostUpdatePage() {
 
   const hashtagList = useMemo(() => parseHashtags(form.hashtag), [form.hashtag]);
 
+  const displayedThumbnailUrl = useMemo(() => {
+    if (newThumbnailPreview) return newThumbnailPreview;
+    if (!removeThumbnail && existingThumbnail?.file_path) {
+      return buildImageUrl(existingThumbnail.file_path);
+    }
+    return "";
+  }, [newThumbnailPreview, removeThumbnail, existingThumbnail]);
+
+  const displayedThumbnailName = useMemo(() => {
+    if (newThumbnailFile) return newThumbnailFile.name;
+    if (!removeThumbnail && existingThumbnail?.original_name) {
+      return existingThumbnail.original_name;
+    }
+    return "";
+  }, [newThumbnailFile, removeThumbnail, existingThumbnail]);
+
   useEffect(() => {
     loadInitialData();
   }, [id]);
+
+  useEffect(() => {
+    return () => {
+      if (newThumbnailPreview) {
+        URL.revokeObjectURL(newThumbnailPreview);
+      }
+    };
+  }, [newThumbnailPreview]);
 
   async function loadInitialData() {
     setLoading(true);
@@ -174,13 +218,19 @@ export default function PostUpdatePage() {
       ]);
 
       if (!categoryResult.ok) {
-        showPopup("error", getBackendMessage(categoryResult.data, "Không tải được category"));
+        showPopup(
+          "error",
+          getBackendMessage(categoryResult.data, "Không tải được category")
+        );
         setLoading(false);
         return;
       }
 
       if (!postResult.ok) {
-        showPopup("error", getBackendMessage(postResult.data, "Không tải được bài viết"));
+        showPopup(
+          "error",
+          getBackendMessage(postResult.data, "Không tải được bài viết")
+        );
         setLoading(false);
         return;
       }
@@ -190,6 +240,10 @@ export default function PostUpdatePage() {
 
       setCategories(categoryList);
       setPostMeta(post);
+      setExistingThumbnail(post?.thumbnail || null);
+      setNewThumbnailFile(null);
+      setNewThumbnailPreview("");
+      setRemoveThumbnail(false);
 
       const subcategoryId = post?.subcategory_id
         ? String(post.subcategory_id)
@@ -284,6 +338,43 @@ export default function PostUpdatePage() {
     setHashtagInput("");
   }
 
+  function handleThumbnailChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showPopup("error", "Thumbnail phải là file ảnh hợp lệ");
+      return;
+    }
+
+    if (newThumbnailPreview) {
+      URL.revokeObjectURL(newThumbnailPreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setNewThumbnailFile(file);
+    setNewThumbnailPreview(previewUrl);
+    setRemoveThumbnail(false);
+  }
+
+  function handleRemoveThumbnail() {
+    if (newThumbnailPreview) {
+      URL.revokeObjectURL(newThumbnailPreview);
+    }
+
+    if (newThumbnailFile) {
+      setNewThumbnailFile(null);
+      setNewThumbnailPreview("");
+      return;
+    }
+
+    if (existingThumbnail) {
+      setRemoveThumbnail(true);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setRedirectToastId(null);
@@ -293,21 +384,31 @@ export default function PostUpdatePage() {
       return;
     }
 
-    const payload = {
-      title: form.title.trim(),
-      hashtag: formatHashtagValue(form.hashtag),
-      status: form.status,
-      content: form.content,
-      subcategory_id: Number(selectedSubcategoryId),
-    };
+    const formData = new FormData();
+    formData.append("title", form.title.trim());
+    formData.append("hashtag", formatHashtagValue(form.hashtag));
+    formData.append("status", String(form.status));
+    formData.append("content", form.content);
+    formData.append("subcategory_id", String(selectedSubcategoryId));
+
+    if (newThumbnailFile) {
+      formData.append("thumbnail", newThumbnailFile);
+    }
+
+    if (removeThumbnail && !newThumbnailFile) {
+      formData.append("remove_thumbnail", "true");
+    }
 
     setSubmitting(true);
 
     try {
-      const result = await updatePostApi(id, payload);
+      const result = await updatePostApi(id, formData);
 
       if (!result.ok) {
-        showPopup("error", getBackendMessage(result.data, "Cập nhật bài viết thất bại"));
+        showPopup(
+          "error",
+          getBackendMessage(result.data, "Cập nhật bài viết thất bại")
+        );
         setSubmitting(false);
         return;
       }
@@ -321,6 +422,14 @@ export default function PostUpdatePage() {
       const updatedPost = result.data?.post;
       if (updatedPost) {
         setPostMeta(updatedPost);
+        setExistingThumbnail(updatedPost.thumbnail || null);
+        setRemoveThumbnail(false);
+
+        if (newThumbnailPreview) {
+          URL.revokeObjectURL(newThumbnailPreview);
+        }
+        setNewThumbnailFile(null);
+        setNewThumbnailPreview("");
 
         const updatedSubcategoryId = updatedPost?.subcategory_id
           ? String(updatedPost.subcategory_id)
@@ -370,8 +479,8 @@ export default function PostUpdatePage() {
             Cập nhật bài viết
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Chỉnh sửa nội dung bài viết, thay đổi chuyên mục và cập nhật trạng
-            thái hiển thị.
+            Chỉnh sửa nội dung bài viết, thay đổi chuyên mục, thumbnail và cập
+            nhật trạng thái hiển thị.
           </p>
         </div>
       </div>
@@ -398,58 +507,66 @@ export default function PostUpdatePage() {
                 />
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <div>
+                <label
+                  htmlFor="slug-preview"
+                  className="mb-2 block text-sm font-semibold text-slate-700"
+                >
                   Slug preview
-                </p>
-                <p className="mt-2 break-all text-sm font-bold text-cyan-700">
-                  /{slugPreview || "slug-se-duoc-tao-tu-dong"}
-                </p>
+                </label>
+
+                <div
+                  id="slug-preview"
+                  className="flex min-h-[46px] items-center rounded-xl border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900"
+                >
+                  <p className="break-all text-sm font-bold text-cyan-700">
+                    /{slugPreview || "slug-se-duoc-tao-tu-dong"}
+                  </p>
+                </div>
               </div>
             </div>
-
             <div>
-            <label
-              htmlFor="hashtag"
-              className="mb-2 block text-sm font-semibold text-slate-700"
-            >
-              Hashtag
-            </label>
-            <div className="flex min-h-[46px] flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 transition focus-within:border-cyan-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-100">
-              {hashtagList.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-700"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeHashtagToken(tag)}
-                    className="text-cyan-700/80 transition hover:text-cyan-900"
-                    aria-label={`Xóa ${tag}`}
+              <label
+                htmlFor="hashtag"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
+                Hashtag
+              </label>
+              <div className="flex min-h-[46px] flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 transition focus-within:border-cyan-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-cyan-100">
+                {hashtagList.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-700"
                   >
-                    ×
-                  </button>
-                </span>
-              ))}
-              <input
-                id="hashtag"
-                name="hashtag"
-                placeholder={
-                  hashtagList.length === 0
-                    ? "Gõ hashtag rồi bấm Space (ví dụ: gioithieu)"
-                    : "Thêm hashtag..."
-                }
-                value={hashtagInput}
-                onChange={(e) => setHashtagInput(e.target.value)}
-                onKeyDown={handleHashtagKeyDown}
-                onBlur={handleHashtagBlur}
-                className="min-w-[160px] flex-1 bg-transparent text-sm text-slate-900 outline-none"
-              />
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              Space/Enter để tạo tag tự động dạng #hashtag.
-            </p>
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeHashtagToken(tag)}
+                      className="text-cyan-700/80 transition hover:text-cyan-900"
+                      aria-label={`Xóa ${tag}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id="hashtag"
+                  name="hashtag"
+                  placeholder={
+                    hashtagList.length === 0
+                      ? "Gõ hashtag rồi bấm Space (ví dụ: gioithieu)"
+                      : "Thêm hashtag..."
+                  }
+                  value={hashtagInput}
+                  onChange={(e) => setHashtagInput(e.target.value)}
+                  onKeyDown={handleHashtagKeyDown}
+                  onBlur={handleHashtagBlur}
+                  className="min-w-[160px] flex-1 bg-transparent text-sm text-slate-900 outline-none"
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Space/Enter để tạo tag tự động dạng #hashtag.
+              </p>
             </div>
 
             <div className="grid gap-5 md:grid-cols-3">
@@ -463,8 +580,12 @@ export default function PostUpdatePage() {
                   <button
                     type="button"
                     onClick={() => setIsStatusUnlocked((prev) => !prev)}
-                    title={isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"}
-                    aria-label={isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"}
+                    title={
+                      isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"
+                    }
+                    aria-label={
+                      isStatusUnlocked ? "Khóa trạng thái" : "Mở khóa trạng thái"
+                    }
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
                       isStatusUnlocked
                         ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
@@ -472,7 +593,6 @@ export default function PostUpdatePage() {
                     }`}
                   >
                     {isStatusUnlocked ? (
-                      // unlock icon
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -485,7 +605,6 @@ export default function PostUpdatePage() {
                         <path d="M8 11V8a4 4 0 1 1 8 0" />
                       </svg>
                     ) : (
-                      // lock icon
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -530,7 +649,9 @@ export default function PostUpdatePage() {
                     type="button"
                     onClick={() => setIsCategoryUnlocked((prev) => !prev)}
                     title={isCategoryUnlocked ? "Khóa category" : "Mở khóa category"}
-                    aria-label={isCategoryUnlocked ? "Khóa category" : "Mở khóa category"}
+                    aria-label={
+                      isCategoryUnlocked ? "Khóa category" : "Mở khóa category"
+                    }
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
                       isCategoryUnlocked
                         ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
@@ -538,7 +659,6 @@ export default function PostUpdatePage() {
                     }`}
                   >
                     {isCategoryUnlocked ? (
-                      // unlock icon
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -551,7 +671,6 @@ export default function PostUpdatePage() {
                         <path d="M8 11V8a4 4 0 1 1 8 0" />
                       </svg>
                     ) : (
-                      // lock icon
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -594,8 +713,16 @@ export default function PostUpdatePage() {
                   <button
                     type="button"
                     onClick={() => setIsSubcategoryUnlocked((prev) => !prev)}
-                    title={isSubcategoryUnlocked ? "Khóa subcategory" : "Mở khóa subcategory"}
-                    aria-label={isSubcategoryUnlocked ? "Khóa subcategory" : "Mở khóa subcategory"}
+                    title={
+                      isSubcategoryUnlocked
+                        ? "Khóa subcategory"
+                        : "Mở khóa subcategory"
+                    }
+                    aria-label={
+                      isSubcategoryUnlocked
+                        ? "Khóa subcategory"
+                        : "Mở khóa subcategory"
+                    }
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
                       isSubcategoryUnlocked
                         ? "border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100"
@@ -603,7 +730,6 @@ export default function PostUpdatePage() {
                     }`}
                   >
                     {isSubcategoryUnlocked ? (
-                      // unlock icon
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -616,7 +742,6 @@ export default function PostUpdatePage() {
                         <path d="M8 11V8a4 4 0 1 1 8 0" />
                       </svg>
                     ) : (
-                      // lock icon
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -649,6 +774,71 @@ export default function PostUpdatePage() {
                 </select>
               </div>
             </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                Thumbnail bài viết
+              </label>
+
+              <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4">
+                {displayedThumbnailUrl ? (
+                  <div className="space-y-3">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <img
+                        src={displayedThumbnailUrl}
+                        alt="Thumbnail preview"
+                        className="h-64 w-full object-cover"
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      <p className="font-semibold text-slate-900">
+                        {newThumbnailFile
+                          ? "Ảnh mới đang chọn"
+                          : removeThumbnail
+                          ? "Thumbnail sẽ bị xóa"
+                          : "Thumbnail hiện tại"}
+                      </p>
+                      <p className="mt-1 break-all text-slate-600">
+                        {displayedThumbnailName || "—"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">
+                    {removeThumbnail
+                      ? "Thumbnail cũ sẽ bị xóa sau khi lưu thay đổi."
+                      : "Bài viết hiện chưa có thumbnail."}
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <label className="inline-flex cursor-pointer items-center rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-700">
+                    {displayedThumbnailUrl ? "Chọn thumbnail mới" : "Tải thumbnail lên"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleThumbnailChange}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {(displayedThumbnailUrl || removeThumbnail) && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveThumbnail}
+                      className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                    >
+                      {newThumbnailFile ? "Bỏ ảnh mới" : "Xóa thumbnail hiện tại"}
+                    </button>
+                  )}
+                </div>
+
+                <p className="mt-3 text-xs text-slate-500">
+                  Hỗ trợ ảnh jpg, jpeg, png, webp, gif.
+                </p>
+              </div>
+            </div>
           </div>
 
           <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-5 xl:sticky xl:top-6">
@@ -670,14 +860,18 @@ export default function PostUpdatePage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   Trạng thái
                 </p>
-                <p className="mt-1 text-slate-700">Hiện tại: {originalStatusLabel}</p>
+                <p className="mt-1 text-slate-700">
+                  Hiện tại: {originalStatusLabel}
+                </p>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   Category
                 </p>
-                <p className="mt-1 text-slate-700">Category hiện tại: {originalCategoryName}</p>
+                <p className="mt-1 text-slate-700">
+                  Category hiện tại: {originalCategoryName}
+                </p>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-3">
@@ -691,18 +885,6 @@ export default function PostUpdatePage() {
 
               <div className="rounded-xl border border-slate-200 bg-white p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  Slug
-                </p>
-                <p className="mt-1 break-all text-slate-700">
-                  Slug hiện tại: /{postMeta?.slug || "—"}
-                </p>
-                {/* <p className="mt-1 break-all font-semibold text-cyan-700">
-                  Slug preview: /{slugPreview || "slug-se-duoc-tao-tu-dong"}
-                </p> */}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                   Hashtag
                 </p>
                 <p className="mt-1 text-slate-700">
@@ -712,25 +894,40 @@ export default function PostUpdatePage() {
                   </span>
                 </p>
               </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Thumbnail
+                </p>
+                <p className="mt-1 text-slate-700">
+                  {newThumbnailFile
+                    ? "Đang chọn thumbnail mới"
+                    : removeThumbnail
+                    ? "Sẽ xóa thumbnail khi lưu"
+                    : existingThumbnail
+                    ? "Đang giữ thumbnail cũ"
+                    : "Chưa có thumbnail"}
+                </p>
+              </div>
             </div>
           </aside>
         </div>
 
         <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Nội dung bài viết
-            </label>
-            <div className="overflow-hidden rounded-xl border border-slate-300 bg-white">
-              <PostEditor
-                value={form.content}
-                onChange={(content) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    content,
-                  }))
-                }
-              />
-            </div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Nội dung bài viết
+          </label>
+          <div className="overflow-hidden rounded-xl border border-slate-300 bg-white">
+            <PostEditor
+              value={form.content}
+              onChange={(content) =>
+                setForm((prev) => ({
+                  ...prev,
+                  content,
+                }))
+              }
+            />
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">

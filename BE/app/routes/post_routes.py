@@ -84,7 +84,8 @@ def get_post_by_id(post_id):
 @post_bp.route("", methods=["POST"])
 @login_required
 def create_post():
-    data = request.get_json(silent=True) or {}
+    data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+    thumbnail = request.files.get("thumbnail")
 
     try:
         validated_data = post_create_schema.load(data)
@@ -101,6 +102,7 @@ def create_post():
         status=parse_bool(validated_data.get("status", True)),
         subcategory_id=parse_int(validated_data.get("subcategory_id"), "subcategory_id"),
         author_id=current_user.id,
+        thumbnail_file=thumbnail,
     )
 
     if error:
@@ -115,7 +117,8 @@ def create_post():
 @post_bp.route("/<int:post_id>", methods=["PUT"])
 @login_required
 def update_post(post_id):
-    data = request.get_json(silent=True) or {}
+    data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+    thumbnail = request.files.get("thumbnail")
 
     try:
         validated_data = post_update_schema.load(data)
@@ -132,6 +135,8 @@ def update_post(post_id):
         hashtag=validated_data.get("hashtag"),
         status=parse_bool(validated_data["status"]) if "status" in validated_data else None,
         subcategory_id=parse_int(validated_data["subcategory_id"], "subcategory_id") if "subcategory_id" in validated_data else None,
+        thumbnail_file=thumbnail,
+        remove_thumbnail=parse_bool(validated_data["remove_thumbnail"]) if "remove_thumbnail" in validated_data else False,
     )
 
     if error:

@@ -113,7 +113,7 @@ export default function PostPage() {
 
             {post.hashtag && (
               <div className="mt-4 text-sm font-medium text-blue-600">
-                #{post.hashtag}
+                {post.hashtag}
               </div>
             )}
 

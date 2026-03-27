@@ -23,10 +23,17 @@ class Media(db.Model):
 
     upload_at = db.Column(db.DateTime, default=vn_now)
 
-    caption = db.Column(db.String(500))
 
     post_links = db.relationship(
         "PostMedia",
         back_populates="media",
         cascade="all, delete-orphan"
     )
+    
+    banner_items = db.relationship(
+        "BannerItem",
+        back_populates="media"
+    )
+
+    def __repr__(self):
+        return f"<Media {self.id} - {self.file_name}>"

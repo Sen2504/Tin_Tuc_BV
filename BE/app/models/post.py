@@ -24,6 +24,13 @@ class Post(db.Model):
     create_at = db.Column(db.DateTime, default=vn_now)
     update_at = db.Column(db.DateTime, default=vn_now, onupdate=vn_now)
 
+    # thumbnail riêng của post
+    thumbnail_original_name = db.Column(db.String(500), nullable=True)
+    thumbnail_file_name = db.Column(db.String(255), nullable=True)
+    thumbnail_path = db.Column(db.String(500), nullable=True)
+    thumbnail_mime_type = db.Column(db.String(100), nullable=True)
+    thumbnail_file_size = db.Column(db.BigInteger, nullable=True)
+
     # FK tới subcategory
     subcategory_id = db.Column(
         db.Integer,

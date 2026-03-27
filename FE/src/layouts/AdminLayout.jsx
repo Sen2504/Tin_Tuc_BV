@@ -194,6 +194,49 @@ export default function AdminLayout({ setIsAuthenticated }) {
         </svg>
       ),
     },
+    {
+      label: "Quản lý thông tin trang chủ",
+      path: "/info/list",
+      paths: ["/info/create", "/info/list", "/info/update"],
+      icon: (
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+        >
+          <rect x="4" y="5" width="16" height="14" rx="2" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 9h8M8 13h5"
+          />
+          <circle cx="16.5" cy="14.5" r="1.5" />
+        </svg>
+      ),
+    },
+    {
+      label: "Quản lý banner",
+      path: "/banner/list",
+      paths: ["/banner/list", "/banner/create", "/banner/update"],
+      icon: (
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 12h8M12 8v8"
+          />
+        </svg>
+      ),
+    }
   ];
 
   const visibleMenuItems = menuItems.filter((item) => {
@@ -228,10 +271,10 @@ export default function AdminLayout({ setIsAuthenticated }) {
                   Admin Dashboard
                 </p>
                 <h2 className="mt-1 whitespace-nowrap text-lg font-bold text-white">
-                  {userName}
+                  {isLoadingUser ? "Đang tải..." : userName}
                 </h2>
                 <p className="mt-1 whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-blue-300">
-                  Role: {userRole}
+                  Role: {isLoadingUser ? "..." : userRole}
                 </p>
               </div>
             </div>

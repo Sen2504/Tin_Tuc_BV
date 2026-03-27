@@ -26,36 +26,6 @@ subcategory_simple_response_schema = SubcategorySimpleResponseSchema()
 subcategory_response_schema = SubcategoryResponseSchema()
 
 
-# def serialize_category(category, include_subcategories=False):
-#     data = {
-#         "id": category.id,
-#         "name": category.name,
-#         "slug": category.slug,
-#         "description": category.description,
-#         "status": category.status,
-#     }
-
-#     if include_subcategories:
-#         data["subcategories"] = [
-#             {
-#                 "id": s.id,
-#                 "name": s.name,
-#                 "slug": s.slug,
-#                 "description": s.description,
-#                 "status": s.status,
-#                 "thumbnail_media_id": s.thumbnail_media_id,
-#                 "thumbnail": {
-#                     "id": s.thumbnail_media.id,
-#                     "file_path": s.thumbnail_media.file_path,
-#                     "file_name": s.thumbnail_media.file_name,
-#                     "original_name": s.thumbnail_media.original_name,
-#                 } if s.thumbnail_media else None
-#             }
-#             for s in category.subcategories
-#         ]
-
-#     return data
-
 def parse_bool(value):
     if isinstance(value, bool):
         return value

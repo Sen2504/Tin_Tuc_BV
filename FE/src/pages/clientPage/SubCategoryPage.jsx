@@ -4,6 +4,8 @@ import { getPostsBySubcategorySlugApi } from "@/api/postApi";
 import { getCategorySubcategoriesBySlugApi } from "@/api/categoryApi";
 import CategorySidebar from "@/components/CategorySidebar";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function SubCategoryPage() {
   const { categorySlug, subcategorySlug } = useParams();
   const navigate = useNavigate();
@@ -43,10 +45,9 @@ export default function SubCategoryPage() {
     const fetchedPosts = postResult.data.posts || [];
 
     if (fetchedPosts.length === 1) {
-      navigate(
-        `/${categorySlug}/${subcategorySlug}/${fetchedPosts[0].slug}`,
-        { replace: true }
-      );
+      navigate(`/${categorySlug}/${subcategorySlug}/${fetchedPosts[0].slug}`, {
+        replace: true,
+      });
       return;
     }
 
@@ -109,20 +110,36 @@ export default function SubCategoryPage() {
                 <Link
                   key={post.id}
                   to={`/${category.slug}/${subcategory.slug}/${post.slug}`}
-                  className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                 >
-                  <h2 className="text-lg font-bold text-zinc-800">
-                    {post.title}
-                  </h2>
+                  <div className="aspect-[4/3] bg-zinc-100">
+                    {post.thumbnail?.file_path ? (
+                      <img
+                        src={`${API_BASE_URL}${post.thumbnail.file_path}`}
+                        alt={post.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-zinc-400">
+                        Chưa có ảnh
+                      </div>
+                    )}
+                  </div>
 
-                  {post.excerpt && (
-                    <p className="mt-3 line-clamp-3 text-sm text-zinc-500">
-                      {post.excerpt}
-                    </p>
-                  )}
+                  <div className="p-5">
+                    <h2 className="text-lg font-bold text-zinc-800">
+                      {post.title}
+                    </h2>
 
-                  <div className="mt-4 text-sm font-medium text-blue-600">
-                    Xem chi tiết →
+                    {post.excerpt && (
+                      <p className="mt-3 line-clamp-3 text-sm text-zinc-500">
+                        {post.excerpt}
+                      </p>
+                    )}
+
+                    <div className="mt-4 text-sm font-medium text-blue-600">
+                      Xem chi tiết →
+                    </div>
                   </div>
                 </Link>
               ))}

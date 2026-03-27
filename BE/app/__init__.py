@@ -43,11 +43,19 @@ def create_app():
     from app.routes.subcategory_routes import subcategory_bp
     from app.routes.media_routes import media_bp
     from app.routes.post_routes import post_bp
+    from app.routes.info_route import info_bp
+    from app.routes.info_stat_routes import info_stat_bp
+    from app.routes.banner_routes import banner_bp
+    from app.routes.banner_item_routes import banner_item_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(category_bp)
     app.register_blueprint(subcategory_bp)
+    app.register_blueprint(banner_bp)
+    app.register_blueprint(banner_item_bp)
+    app.register_blueprint(info_bp)
+    app.register_blueprint(info_stat_bp)
     app.register_blueprint(media_bp)
     app.register_blueprint(post_bp)
 

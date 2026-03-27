@@ -45,42 +45,24 @@ export async function getPostByIdApi(postId) {
   return parseResponse(response);
 }
 
-export async function createPostApi(payload) {
+export async function createPostApi(formData) {
   const response = await fetch(`${API_BASE_URL}/api/posts`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
     credentials: "include",
-    body: JSON.stringify(payload),
+    body: formData,
   });
 
   return parseResponse(response);
 }
 
-export async function updatePostApi(postId, payload) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(payload),
-    });
+export async function updatePostApi(postId, formData) {
+  const response = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+    method: "PUT",
+    credentials: "include",
+    body: formData,
+  });
 
-    const data = await res.json();
-
-    return {
-      ok: res.ok,
-      data,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      data: { error: "Server connection error" },
-    };
-  }
+  return parseResponse(response);
 }
 
 export async function deletePostApi(postId) {

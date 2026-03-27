@@ -32,7 +32,7 @@ export default function Header() {
               <Link
                 to="/"
                 aria-label="Về trang chủ"
-                className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-xl border-[3px] border-sky-500 shadow-md transition hover:opacity-90"
+                className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-xl border-[3px] border-emerald-600 shadow-md transition hover:opacity-90"
               >
                 <img
                   src={logo}
@@ -43,13 +43,13 @@ export default function Header() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-sky-400">
+              <p className="text-xs font-semibold uppercase tracking-widest text-emerald-500">
                 Tỉnh Đồng Tháp
               </p>
 
               <h1 className="text-2xl font-extrabold leading-tight text-gray-800 lg:text-3xl">
                 Bệnh viện{" "}
-                <span className="text-sky-500">Phục hồi chức năng</span>
+                <span className="text-emerald-600">Phục hồi chức năng</span>
               </h1>
             </div>
           </div>
@@ -82,10 +82,10 @@ export default function Header() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50 px-5 py-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500 shadow">
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-800/30 bg-emerald-900 px-5 py-3 shadow-md">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 shadow">
                 <svg
-                  className="h-5 w-5 text-white"
+                  className="h-5 w-5 text-emerald-50"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -100,10 +100,10 @@ export default function Header() {
               </div>
 
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-400">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-200">
                   Bác sĩ thường trực
                 </p>
-                <p className="text-base font-bold text-gray-800">
+                <p className="text-base font-extrabold text-white">
                   0817 666 115
                 </p>
               </div>
@@ -121,13 +121,13 @@ export default function Header() {
       </div>
 
       {/* Desktop navbar */}
-      <nav className="hidden bg-sky-500 md:block">
+      <nav className="hidden bg-emerald-700 md:block">
         <div className="mx-auto flex max-w-[1400px]">
           {menuItems.map((item) => (
             <div key={item.id} className="group relative flex-1">
               <Link
                 to={`/${item.slug}`}
-                className="flex items-center justify-center gap-1.5 border-r border-sky-400/60 px-3 py-3.5 text-[12.5px] font-bold tracking-wide text-white transition duration-200 hover:bg-sky-600 last:border-r-0"
+                className="flex items-center justify-center gap-1.5 border-r border-emerald-500/60 px-3 py-3.5 text-[12.5px] font-bold tracking-wide text-emerald-50 transition duration-200 hover:bg-emerald-800 last:border-r-0"
               >
                 {item.name}
 
@@ -149,15 +149,15 @@ export default function Header() {
               </Link>
 
               {item.subcategories?.length > 0 && (
-                <div className="invisible absolute left-0 top-full z-50 min-w-[220px] translate-y-1 rounded-b-2xl border border-sky-100 bg-white opacity-0 shadow-2xl transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                <div className="invisible absolute left-0 top-full z-50 min-w-[220px] translate-y-1 rounded-b-2xl border border-emerald-100 bg-white opacity-0 shadow-2xl transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
                   <div className="overflow-hidden rounded-b-2xl py-1">
                     {item.subcategories.map((sub) => (
                       <Link
                         key={sub.id}
                         to={`/${item.slug}/${sub.slug}`}
-                        className="flex items-center gap-2 border-b border-gray-50 px-5 py-2.5 text-sm text-gray-700 transition hover:bg-sky-50 hover:text-sky-600 last:border-b-0"
+                        className="flex items-center gap-2 border-b border-gray-50 px-5 py-2.5 text-sm text-gray-700 transition hover:bg-emerald-50 hover:text-emerald-700 last:border-b-0"
                       >
-                        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-sky-400" />
+                        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-emerald-500" />
                         {sub.name}
                       </Link>
                     ))}
@@ -171,13 +171,13 @@ export default function Header() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="border-t border-sky-200 bg-white shadow-lg md:hidden">
+        <div className="border-t border-emerald-200 bg-white shadow-lg md:hidden">
           {menuItems.map((item, index) => (
             <div key={item.id} className="border-b border-gray-100">
               <div className="flex items-center justify-between px-5 py-3">
                 <Link
                   to={`/${item.slug}`}
-                  className="text-sm font-semibold text-gray-700 transition hover:text-sky-600"
+                  className="text-sm font-semibold text-gray-700 transition hover:text-emerald-700"
                   onClick={() => setMobileOpen(false)}
                 >
                   {item.name}
@@ -189,7 +189,7 @@ export default function Header() {
                     onClick={() =>
                       setOpenMobileSub(openMobileSub === index ? null : index)
                     }
-                    className="ml-3 text-sm font-semibold text-gray-500 transition hover:text-sky-600"
+                    className="ml-3 text-sm font-semibold text-gray-500 transition hover:text-emerald-700"
                   >
                     {openMobileSub === index ? "▲" : "▼"}
                   </button>
@@ -197,12 +197,12 @@ export default function Header() {
               </div>
 
               {item.subcategories?.length > 0 && openMobileSub === index && (
-                <div className="bg-sky-50 px-5 pb-3">
+                <div className="bg-emerald-50 px-5 pb-3">
                   {item.subcategories.map((sub) => (
                     <Link
                       key={sub.id}
                       to={`/${item.slug}/${sub.slug}`}
-                      className="block py-1.5 text-sm text-gray-600 transition hover:text-sky-600"
+                      className="block py-1.5 text-sm text-gray-600 transition hover:text-emerald-700"
                       onClick={() => setMobileOpen(false)}
                     >
                       · {sub.name}
