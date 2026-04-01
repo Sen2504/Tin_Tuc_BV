@@ -41,10 +41,6 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-function countActiveItems(items = []) {
-  return items.filter((item) => item?.status).length;
-}
-
 function buildImageUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
@@ -98,7 +94,6 @@ export default function BannerListPage() {
   }
 
   async function handleChangeStatus(bannerId, nextStatus) {
-
     setUpdatingIds((prev) => [...prev, bannerId]);
 
     const result = await updateBannerApi(bannerId, { status: nextStatus });
@@ -109,9 +104,27 @@ export default function BannerListPage() {
       return;
     }
 
-    showPopup("success", "Cập nhật trạng thái banner thành công");
+    setBanners((prev) =>
+      prev.map((banner) => {
+        if (banner.id === bannerId) {
+          return {
+            ...banner,
+            status: nextStatus,
+          };
+        }
 
-    await loadBanners();
+        if (nextStatus) {
+          return {
+            ...banner,
+            status: false,
+          };
+        }
+
+        return banner;
+      })
+    );
+
+    showPopup("success", "Cập nhật trạng thái banner thành công");
     setUpdatingIds((prev) => prev.filter((id) => id !== bannerId));
   }
 
@@ -267,8 +280,9 @@ export default function BannerListPage() {
                   {banners.map((banner) => {
                     const isUpdating = updatingIds.includes(banner.id);
                     const isDeleting = deletingIds.includes(banner.id);
-                    const itemCount = banner.banner_items?.length || 0;
-                    const activeItemCount = countActiveItems(banner.banner_items || []);
+                    const itemCount = banner.items_count || 0;
+                    const activeItemCount = banner.active_items_count || 0;
+                    const previewItems = banner.preview_items || [];
 
                     return (
                       <tr key={banner.id} className="hover:bg-slate-50/70">
@@ -280,9 +294,9 @@ export default function BannerListPage() {
                         </td>
 
                         <td className="px-4 py-4 align-top">
-                          {itemCount > 0 ? (
+                          {previewItems.length > 0 ? (
                             <div className="flex -space-x-2">
-                              {banner.banner_items.slice(0, 3).map((item) => (
+                              {previewItems.map((item) => (
                                 <img
                                   key={item.id}
                                   src={buildImageUrl(item.media?.file_path || "")}

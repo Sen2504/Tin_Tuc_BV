@@ -9,6 +9,12 @@ from app.schemas.post_schema import (
     PostResponseSchema,
     PostPublicListItemSchema,
     PostPublicDetailSchema,
+    # ======================= Mới thêm để trả về dữ liệu tổng hợp cho trang quản trị ========================
+    PostAdminListItemSchema,
+    PostStatusResponseSchema,
+    PostCreateResponseSchema,
+    PostEditResponseSchema,
+    PostUpdateResponseSchema,
 )
 
 post_bp = Blueprint("posts", __name__, url_prefix="/api/posts")
@@ -21,7 +27,12 @@ posts_response_schema = PostResponseSchema(many=True)
 
 post_public_list_item_schema = PostPublicListItemSchema(many=True)
 post_public_detail_schema = PostPublicDetailSchema()
-
+# Schema mới để trả về dữ liệu tổng hợp cho trang quản trị
+post_admin_list_item_schema = PostAdminListItemSchema(many=True)
+post_status_response_schema = PostStatusResponseSchema()
+post_create_response_schema = PostCreateResponseSchema()
+post_edit_response_schema = PostEditResponseSchema()
+post_update_response_schema = PostUpdateResponseSchema()
 
 def parse_bool(value):
     if value is None or value == "":
@@ -59,15 +70,17 @@ def parse_int(value, field_name="id"):
 
 # 1. Các route của ADMIN
 # 1.1 Route để get all post của trang admin
-@post_bp.route("", methods=["GET"])
+@post_bp.route("/admin/list", methods=["GET"])
 @login_required
-def get_post():
-    posts, error = PostService.get_post()
+def get_post_admin_list():
+    posts, error = PostService.get_post_admin_list()
 
     if error:
         return jsonify({"error": error}), 400
 
-    return jsonify(posts_response_schema.dump(posts)), 200
+    return jsonify({
+        "posts": post_admin_list_item_schema.dump(posts)
+    }), 200
 
 
 @post_bp.route("/<int:post_id>", methods=["GET"])
@@ -78,7 +91,7 @@ def get_post_by_id(post_id):
     if error:
         return jsonify({"error": error}), 404
 
-    return jsonify(post_response_schema.dump(post)), 200
+    return jsonify(post_edit_response_schema.dump(post)), 200
 
 
 @post_bp.route("", methods=["POST"])
@@ -110,7 +123,7 @@ def create_post():
 
     return jsonify({
         "message": "Tạo bài viết thành công",
-        "post": post_response_schema.dump(post)
+        "post": post_create_response_schema.dump(post)
     }), 201
 
 
@@ -145,7 +158,7 @@ def update_post(post_id):
 
     return jsonify({
         "message": "Bài viết đã được cập nhật",
-        "post": post_response_schema.dump(post)
+        "post": post_update_response_schema.dump(post)
     }), 200
 
 
@@ -189,3 +202,44 @@ def get_post_detail(category_slug, subcategory_slug, post_slug):
         return jsonify({"error": error}), 404
 
     return jsonify(data), 200
+# ====================================================================================
+
+
+@post_bp.route("/<int:post_id>/status", methods=["PUT"])
+@login_required
+def update_post_status(post_id):
+    data = request.get_json(silent=True) or {}
+
+    status_value = data.get("status")
+
+    try:
+        parsed_status = parse_bool(status_value)
+    except ValidationError as err:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": {
+                "status": [str(err)]
+            }
+        }), 400
+
+    if parsed_status is None:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": {
+                "status": ["status là bắt buộc"]
+            }
+        }), 400
+
+    post, error = PostService.update_post_status(
+        post_id=post_id,
+        status=parsed_status
+    )
+
+    if error:
+        status_code = 404 if "not found" in error.lower() else 400
+        return jsonify({"error": error}), status_code
+
+    return jsonify({
+        "message": "Bài viết đã được cập nhật trạng thái",
+        "post": post_status_response_schema.dump(post)
+    }), 200

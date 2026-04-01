@@ -28,4 +28,4 @@ class Banner(db.Model):
     )
 
     def __repr__(self):
-        return f"<Banner {self.id} - {self.title}>"
+        return f"<Banner {self.id}>"

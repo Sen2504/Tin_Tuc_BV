@@ -110,3 +110,55 @@ class InfoUpdateSchema(Schema):
     @validates("remove_image")
     def validate_remove_image(self, value, **kwargs):
         parse_bool(value)
+
+class InfoStatusUpdateSchema(Schema):
+    class Meta:
+        unknown = RAISE
+
+    status = fields.Raw(
+        required=True,
+        error_messages={
+            "required": "Trạng thái là bắt buộc",
+            "null": "Trạng thái không được để trống"
+        }
+    )
+
+    @validates("status")
+    def validate_status(self, value, **kwargs):
+        parse_bool(value)
+
+
+# =========================
+# RESPONSE SCHEMAS
+# =========================
+
+class InfoResponseSchema(Schema):
+    id = fields.Integer()
+    title = fields.String()
+    slogan = fields.String(allow_none=True)
+    description = fields.String(allow_none=True)
+    image = fields.String(allow_none=True)
+    status = fields.Boolean()
+
+
+class InfoCreateResponseSchema(Schema):
+    id = fields.Integer()
+    title = fields.String()
+    status = fields.Boolean()
+
+
+class InfoUpdateResponseSchema(Schema):
+    id = fields.Integer()
+    title = fields.String()
+    status = fields.Boolean()
+
+
+class InfoListResponseSchema(Schema):
+    id = fields.Integer()
+    title = fields.String()
+    status = fields.Boolean()
+
+
+class InfoStatusResponseSchema(Schema):
+    id = fields.Integer()
+    status = fields.Boolean()

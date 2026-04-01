@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from marshmallow import ValidationError
@@ -6,6 +8,9 @@ from app.schemas.banner_schema import (
     BannerCreateSchema,
     BannerUpdateSchema,
     BannerResponseSchema,
+    BannerListResponseSchema,
+    BannerFullCreateSchema,
+    BannerUpdateResponseSchema
 )
 from app.services.banner_service import BannerService
 
@@ -14,9 +19,11 @@ banner_bp = Blueprint("banners", __name__, url_prefix="/api/banners")
 
 banner_create_schema = BannerCreateSchema()
 banner_update_schema = BannerUpdateSchema()
+banner_full_create_schema = BannerFullCreateSchema()
 
 banner_response_schema = BannerResponseSchema()
-banners_response_schema = BannerResponseSchema(many=True)
+banners_list_response_schema = BannerListResponseSchema(many=True)
+banner_update_response_schema = BannerUpdateResponseSchema()
 
 
 def parse_bool(value):
@@ -48,7 +55,7 @@ def get_banners():
     if error:
         return jsonify({"error": error}), 400
 
-    return jsonify(banners_response_schema.dump(banners)), 200
+    return jsonify(banners_list_response_schema.dump(banners)), 200
 
 
 @banner_bp.route("/<int:banner_id>", methods=["GET"])
@@ -59,7 +66,7 @@ def get_banner_by_id(banner_id):
     if error:
         return jsonify({"error": error}), 404
 
-    return jsonify(banner_response_schema.dump(banner)), 200
+    return jsonify(banner_update_response_schema.dump(banner)), 200
 
 
 @banner_bp.route("", methods=["POST"])
@@ -84,7 +91,82 @@ def create_banner():
 
     return jsonify({
         "message": "Tạo banner thành công",
-        "banner": banner_response_schema.dump(banner)
+        "banner": {
+            "id": banner.id,
+            "status": banner.status,
+        }
+    }), 201
+
+
+@banner_bp.route("/full", methods=["POST"])
+@login_required
+def create_banner_full():
+    raw_status = request.form.get("status", True)
+    raw_items = request.form.get("items")
+
+    if raw_items is None:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": {
+                "items": ["items là bắt buộc"]
+            }
+        }), 400
+
+    try:
+        parsed_items = json.loads(raw_items)
+    except json.JSONDecodeError:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": {
+                "items": ["items phải là JSON hợp lệ"]
+            }
+        }), 400
+
+    payload = {
+        "status": raw_status,
+        "items": parsed_items,
+    }
+
+    try:
+        validated_data = banner_full_create_schema.load(payload)
+    except ValidationError as err:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": err.messages
+        }), 400
+
+    files_map = request.files.to_dict()
+
+    for item in validated_data["items"]:
+        image_key = item["image_key"]
+        if image_key not in files_map:
+            return jsonify({
+                "message": "Dữ liệu không hợp lệ",
+                "errors": {
+                    image_key: [f"Thiếu file ảnh cho {image_key}"]
+                }
+            }), 400
+
+    result, error = BannerService.create_banner_full(
+        status=parse_bool(validated_data.get("status", True)),
+        items_data=[
+            {
+                "image_key": item["image_key"],
+                "url": item.get("url"),
+                "sort_order": int(item.get("sort_order", 0)),
+                "status": parse_bool(item.get("status", True)),
+            }
+            for item in validated_data["items"]
+        ],
+        files_map=files_map,
+    )
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    return jsonify({
+        "message": "Tạo banner và banner items thành công",
+        "banner": result
     }), 201
 
 
@@ -112,7 +194,10 @@ def update_banner(banner_id):
 
     return jsonify({
         "message": "Banner đã được cập nhật",
-        "banner": banner_response_schema.dump(banner)
+        "banner": {
+            "id": banner.id,
+            "status": banner.status
+        }
     }), 200
 
 

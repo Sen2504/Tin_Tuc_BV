@@ -9,13 +9,15 @@ from app.models.sub_category import SubCategory
 from app.models.category import Category
 from app.models.media import Media
 from app.utils.slug import generate_unique_slug
+from sqlalchemy import func
+from app.models.post import Post
 
 
 class SubCategoryService:
     ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 
     @staticmethod
-    def _save_thumbnail_file(file, caption=None):
+    def _save_thumbnail_file(file):
         if not file or not file.filename:
             return None, None
 
@@ -44,7 +46,6 @@ class SubCategoryService:
             file_path=f"/uploads/subcategories/{unique_name}",
             mime_type=file.mimetype,
             file_size=os.path.getsize(absolute_path),
-            caption=caption
         )
 
         db.session.add(media)
@@ -107,8 +108,7 @@ class SubCategoryService:
         thumbnail_media = None
         if thumbnail_file:
             thumbnail_media, error = SubCategoryService._save_thumbnail_file(
-                thumbnail_file,
-                caption=f"Thumbnail - {normalized_name}"
+                thumbnail_file
             )
             if error:
                 return None, error
@@ -192,8 +192,7 @@ class SubCategoryService:
             # user upload thumbnail mới
             if thumbnail_file:
                 thumbnail_media, error = SubCategoryService._save_thumbnail_file(
-                    thumbnail_file,
-                    caption=f"Thumbnail - {subcategory.name}"
+                    thumbnail_file
                 )
                 if error:
                     db.session.rollback()
@@ -220,10 +219,6 @@ class SubCategoryService:
         except Exception as e:
             db.session.rollback()
             return None, str(e)
-
-    @staticmethod
-    def get_subcategories():
-        return SubCategory.query.order_by(SubCategory.id).all()
 
     @staticmethod
     def get_subcategory(subcategory_id):
@@ -254,3 +249,63 @@ class SubCategoryService:
         except Exception as e:
             db.session.rollback()
             return False, str(e)
+        
+# ======================================================================================
+# Các hàm lấy dữ liệu tổng hợp để hiển thị ở trang quản trị
+    @staticmethod
+    def get_subcategory_list_summary(include_inactive=False):
+        rows = (
+            db.session.query(
+                SubCategory.id.label("id"),
+                SubCategory.name.label("name"),
+                SubCategory.status.label("status"),
+                Category.name.label("category_name"),
+                func.count(Post.id).label("posts_count")
+            )
+            .join(Category, SubCategory.category_id == Category.id)
+            .outerjoin(Post, Post.subcategory_id == SubCategory.id)
+            .group_by(
+                SubCategory.id,
+                SubCategory.name,
+                SubCategory.status,
+                Category.name
+            )
+            .order_by(SubCategory.id)
+            .all()
+        )
+
+        return rows
+    
+    @staticmethod
+    def update_subcategory_status(subcategory_id, status):
+        subcategory = SubCategory.query.get(subcategory_id)
+
+        if not subcategory:
+            return None, "Danh mục con không tìm thấy"
+
+        try:
+            subcategory.status = status
+            db.session.commit()
+            return subcategory, None
+        except Exception as e:
+            db.session.rollback()
+            return None, str(e)
+        
+    @staticmethod
+    def get_subcategory_options(category_id=None, include_inactive=False):
+        query = (
+            SubCategory.query
+            .join(Category, SubCategory.category_id == Category.id)
+        )
+
+        if category_id is not None:
+            query = query.filter(SubCategory.category_id == category_id)
+
+        if not include_inactive:
+            query = query.filter(
+                SubCategory.status.is_(True),
+                Category.status.is_(True)
+            )
+
+        subcategories = query.order_by(SubCategory.name.asc()).all()
+        return subcategories, None

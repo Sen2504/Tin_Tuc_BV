@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createBannerApi } from "@/api/bannerApi";
-import { createBannerItemApi } from "@/api/bannerItemApi";
+import { createBannerFullApi } from "@/api/bannerApi";
+import ToastStack from "@/components/ToastStack";
 
 const initialBannerForm = {
   status: true,
@@ -15,14 +15,43 @@ const createEmptyItem = (sortOrder = 0) => ({
   status: true,
 });
 
+function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data?.errors) {
+    const firstField = Object.keys(data.errors)[0];
+    if (firstField && Array.isArray(data.errors[firstField])) {
+      return data.errors[firstField][0];
+    }
+  }
+
+  return fallback;
+}
+
 export default function BannerCreatePage() {
   const navigate = useNavigate();
 
   const [bannerForm, setBannerForm] = useState(initialBannerForm);
   const [items, setItems] = useState([createEmptyItem(0)]);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [toasts, setToasts] = useState([]);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
   const activeCount = useMemo(
     () => items.filter((item) => item.status).length,
@@ -82,17 +111,24 @@ export default function BannerCreatePage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setErrorMessage("");
-    setSuccessMessage("");
 
     if (items.length === 0) {
-      setErrorMessage("Phải có ít nhất 1 banner item");
+      showPopup("error", "Phải có ít nhất 1 banner item");
       return;
     }
 
     for (let i = 0; i < items.length; i++) {
       if (!items[i].image) {
-        setErrorMessage(`Banner item ${i + 1} chưa chọn ảnh`);
+        showPopup("error", `Banner item ${i + 1} chưa chọn ảnh`);
+        return;
+      }
+
+      if (
+        items[i].sort_order === "" ||
+        items[i].sort_order === null ||
+        Number(items[i].sort_order) < 0
+      ) {
+        showPopup("error", `Thứ tự của banner item ${i + 1} không hợp lệ`);
         return;
       }
     }
@@ -100,60 +136,45 @@ export default function BannerCreatePage() {
     setSubmitting(true);
 
     try {
-      const bannerPayload = {
-        status: bannerForm.status,
-      };
+      const formData = new FormData();
 
-      const bannerRes = await createBannerApi(bannerPayload);
+      formData.append("status", String(bannerForm.status));
 
-      if (!bannerRes.ok) {
-        setErrorMessage(
-          bannerRes.data?.error ||
-            bannerRes.data?.message ||
-            "Tạo banner thất bại"
+      const itemsPayload = items.map((item, index) => {
+        const imageKey = `image_${index}`;
+
+        if (item.image) {
+          formData.append(imageKey, item.image);
+        }
+
+        return {
+          image_key: imageKey,
+          url: item.url?.trim() || null,
+          sort_order: Number(item.sort_order) || 0,
+          status: Boolean(item.status),
+        };
+      });
+
+      formData.append("items", JSON.stringify(itemsPayload));
+
+      const result = await createBannerFullApi(formData);
+
+      if (!result.ok) {
+        showPopup(
+          "error",
+          getBackendMessage(result.data, "Tạo banner thất bại")
         );
         setSubmitting(false);
         return;
       }
 
-      const createdBanner = bannerRes.data?.banner;
-      const bannerId = createdBanner?.id;
+      showPopup("success", "Tạo banner thành công");
 
-      if (!bannerId) {
-        setErrorMessage("Không lấy được ID banner sau khi tạo");
-        setSubmitting(false);
-        return;
-      }
-
-      for (const item of items) {
-        const formData = new FormData();
-        formData.append("banner_id", bannerId);
-        formData.append("sort_order", item.sort_order ?? 0);
-        formData.append("status", item.status);
-
-        if (item.image) {
-          formData.append("image", item.image);
-        }
-
-        const itemRes = await createBannerItemApi(formData);
-
-        if (!itemRes.ok) {
-          setErrorMessage(
-            itemRes.data?.error ||
-              itemRes.data?.message ||
-              "Tạo banner item thất bại"
-          );
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      setSuccessMessage("Tạo banner thành công");
       setTimeout(() => {
         navigate("/banner/list");
-      }, 900);
+      }, 2000);
     } catch (error) {
-      setErrorMessage("Có lỗi xảy ra khi tạo banner");
+      showPopup("error", "Có lỗi xảy ra khi tạo banner");
     } finally {
       setSubmitting(false);
     }
@@ -172,18 +193,6 @@ export default function BannerCreatePage() {
             bộ cụm này sẽ không hiển thị ngoài client.
           </p>
         </div>
-
-        {errorMessage ? (
-          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-            {errorMessage}
-          </div>
-        ) : null}
-
-        {successMessage ? (
-          <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-            {successMessage}
-          </div>
-        ) : null}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -341,6 +350,8 @@ export default function BannerCreatePage() {
             </button>
           </div>
         </form>
+
+        <ToastStack toasts={toasts} removeToast={removeToast} />
       </div>
     </div>
   );

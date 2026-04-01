@@ -131,16 +131,29 @@ class SubcategoryResponseSchema(Schema):
     )
 
 
-class CategoryResponseSchema(Schema):
+class CategorySimpleResponseSchema(Schema):
     id = fields.Integer()
     name = fields.String()
     slug = fields.String()
     description = fields.String(allow_none=True)
     status = fields.Boolean()
-    subcategories = fields.List(fields.Nested(SubcategoryResponseSchema))
 
 
-class CategorySimpleResponseSchema(Schema):
+class CategoryListSummaryResponseSchema(Schema):
+    id = fields.Integer()
+    name = fields.String()
+    description = fields.String(allow_none=True)
+    status = fields.Boolean()
+    subcategories_count = fields.Integer()
+    posts_count = fields.Integer()
+
+# Đây là schemas để dump dữ liệu danh sách các category cho trang subcategory và post dùng
+# ở phần dropdown chọn category khi tạo/sửa subcategory hoặc post, chỉ cần id, name
+class CategoryOptionSchema(Schema):
+    id = fields.Integer()
+    name = fields.String()
+
+class CategoryEditResponseSchema(Schema):
     id = fields.Integer()
     name = fields.String()
     slug = fields.String()

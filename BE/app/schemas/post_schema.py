@@ -320,3 +320,101 @@ class PostPublicDetailSchema(Schema):
             "mime_type": obj.thumbnail_mime_type,
             "file_size": obj.thumbnail_file_size,
         })
+    
+# =========================================================================================
+class PostAdminListAuthorSchema(Schema):
+    username = fields.String(allow_none=True)
+
+
+class PostAdminListCategorySchema(Schema):
+    id = fields.Integer()
+    name = fields.String(allow_none=True)
+
+
+class PostAdminListSubcategorySchema(Schema):
+    id = fields.Integer()
+    name = fields.String(allow_none=True)
+
+
+class PostAdminListItemSchema(Schema):
+    id = fields.Integer()
+    title = fields.String()
+    slug = fields.String()
+    status = fields.Boolean()
+    create_at = fields.String(allow_none=True)
+    update_at = fields.String(allow_none=True)
+    author = fields.Nested(PostAdminListAuthorSchema, allow_none=True)
+    category = fields.Nested(PostAdminListCategorySchema, allow_none=True)
+    subcategory = fields.Nested(PostAdminListSubcategorySchema, allow_none=True)
+
+class PostStatusResponseSchema(Schema):
+    id = fields.Integer()
+    status = fields.Boolean()
+
+class PostCreateResponseSchema(Schema):
+    id = fields.Integer()
+    title = fields.String()
+    slug = fields.String()
+    status = fields.Boolean()
+    subcategory_id = fields.Integer()
+    create_at = fields.Method("get_create_at")
+
+    def get_create_at(self, obj):
+        return obj.create_at.isoformat() if obj.create_at else None
+    
+class PostEditAuthorSchema(Schema):
+    username = fields.String(allow_none=True)
+
+class PostEditCategorySchema(Schema):
+    id = fields.Integer()
+    name = fields.String(allow_none=True)
+
+class PostEditSubcategorySchema(Schema):
+    id = fields.Integer()
+    name = fields.String(allow_none=True)
+
+class PostEditThumbnailSchema(Schema):
+    original_name = fields.String(allow_none=True)
+    file_path = fields.String(allow_none=True)
+
+class PostEditResponseSchema(Schema):
+    id = fields.Integer()
+    title = fields.String()
+    slug = fields.String()
+    content = fields.String()
+    hashtag = fields.String(allow_none=True)
+    status = fields.Boolean()
+    subcategory_id = fields.Integer()
+    author = fields.Method("get_author")
+    category = fields.Method("get_category")
+    subcategory = fields.Method("get_subcategory")
+    thumbnail = fields.Method("get_thumbnail")
+
+    def get_author(self, obj):
+        if not obj.author:
+            return None
+        return PostEditAuthorSchema().dump(obj.author)
+
+    def get_category(self, obj):
+        if not obj.subcategory or not obj.subcategory.category:
+            return None
+        return PostEditCategorySchema().dump(obj.subcategory.category)
+
+    def get_subcategory(self, obj):
+        if not obj.subcategory:
+            return None
+        return PostEditSubcategorySchema().dump(obj.subcategory)
+
+    def get_thumbnail(self, obj):
+        if not obj.thumbnail_path:
+            return None
+
+        return PostEditThumbnailSchema().dump({
+            "original_name": obj.thumbnail_original_name,
+            "file_path": obj.thumbnail_path,
+        })
+    
+class PostUpdateResponseSchema(Schema):
+    id = fields.Int(required=True)
+    status = fields.Bool()
+    update_at = fields.DateTime()

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PostEditor from "../../components/PostEditor";
-import { getCategoriesApi } from "@/api/categoryApi";
 import { createPostApi } from "@/api/postApi";
 import ToastStack from "@/components/ToastStack";
 import { toSlugPreview } from "@/utils/slugPreview";
+import { getCategoryOptionsApi } from "@/api/categoryApi";
+import { getSubcategoryOptionsApi } from "@/api/subcategoryApi";
 
 function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
   if (data?.message) return data.message;
@@ -21,8 +22,10 @@ function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
 }
 
 function normalizeHashtag(rawValue = "") {
-  const slug = toSlugPreview(rawValue.replace(/^#+/, ""));
-  return slug || "";
+  const cleaned = rawValue.trim().replace(/\s+/g, "");
+  if (!cleaned) return "";
+
+  return cleaned.startsWith("#") ? cleaned : `#${cleaned}`;
 }
 
 function parseHashtagString(value = "") {
@@ -43,6 +46,7 @@ export default function CreatePostPage() {
   const [hashtags, setHashtags] = useState([]);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState("");
+  const [subcategories, setSubcategories] = useState([]);
 
   const [form, setForm] = useState({
     title: "",
@@ -93,6 +97,16 @@ export default function CreatePostPage() {
   }, [form.hashtag]);
 
   useEffect(() => {
+    if (!selectedCategoryId) {
+      setSubcategories([]);
+      setSelectedSubcategoryId("");
+      return;
+    }
+
+    loadSubcategories(selectedCategoryId);
+  }, [selectedCategoryId]);
+
+  useEffect(() => {
     return () => {
       if (thumbnailPreview) {
         URL.revokeObjectURL(thumbnailPreview);
@@ -101,7 +115,7 @@ export default function CreatePostPage() {
   }, [thumbnailPreview]);
 
   async function loadCategories() {
-    const result = await getCategoriesApi();
+    const result = await getCategoryOptionsApi();
 
     if (!result.ok) {
       showPopup("error", getBackendMessage(result.data, "Không tải được category"));
@@ -111,12 +125,22 @@ export default function CreatePostPage() {
     setCategories(result.data.categories || []);
   }
 
-  const subcategories = useMemo(() => {
-    const category = categories.find(
-      (c) => String(c.id) === String(selectedCategoryId)
-    );
-    return category?.subcategories || [];
-  }, [categories, selectedCategoryId]);
+  async function loadSubcategories(categoryId) {
+    if (!categoryId) {
+      setSubcategories([]);
+      return;
+    }
+
+    const result = await getSubcategoryOptionsApi(categoryId);
+
+    if (!result.ok) {
+      showPopup("error", getBackendMessage(result.data, "Không tải được subcategory"));
+      setSubcategories([]);
+      return;
+    }
+
+    setSubcategories(result.data.subcategories || []);
+  }
 
   const selectedCategory = useMemo(
     () => categories.find((c) => String(c.id) === String(selectedCategoryId)),
@@ -497,7 +521,7 @@ export default function CreatePostPage() {
                     key={tag}
                     className="inline-flex items-center gap-1 rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-800"
                   >
-                    #{tag}
+                    {tag}
                     <button
                       type="button"
                       onClick={() => handleRemoveHashtag(tag)}

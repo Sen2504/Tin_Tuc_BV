@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { deleteInfoApi, getInfosApi, updateInfoApi } from "@/api/infoApi";
+import { deleteInfoApi, getInfoListApi, updateInfoStatusApi } from "@/api/infoApi";
 import ToastStack from "@/components/ToastStack";
 
 function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
@@ -62,7 +62,7 @@ export default function InfoListPage() {
   async function loadInfos() {
     setLoading(true);
 
-    const result = await getInfosApi();
+    const result = await getInfoListApi();
 
     if (!result.ok) {
       showPopup("error", getBackendMessage(result.data, "Không thể tải danh sách info"));
@@ -112,22 +112,29 @@ export default function InfoListPage() {
     if (!selectedInfo || selectedNextStatus === null) return;
 
     const infoId = selectedInfo.id;
-    const oldStatus = selectedInfo.status;
     const nextStatus = selectedNextStatus;
+    const previousStatusById = new Map(infos.map((item) => [item.id, item.status]));
 
     setUpdatingIds((prev) => [...prev, infoId]);
 
     handleCloseConfirm();
 
-    setInfos((prev) =>
-      prev.map((item) => (item.id === infoId ? { ...item, status: nextStatus } : item))
-    );
+    setInfos((prev) => {
+      if (nextStatus) {
+        return prev.map((item) => ({ ...item, status: item.id === infoId }));
+      }
 
-    const result = await updateInfoApi(infoId, { status: nextStatus });
+      return prev.map((item) => (item.id === infoId ? { ...item, status: false } : item));
+    });
+
+    const result = await updateInfoStatusApi(infoId, nextStatus);
 
     if (!result.ok) {
       setInfos((prev) =>
-        prev.map((item) => (item.id === infoId ? { ...item, status: oldStatus } : item))
+        prev.map((item) => ({
+          ...item,
+          status: previousStatusById.has(item.id) ? previousStatusById.get(item.id) : item.status,
+        }))
       );
       showPopup("error", getBackendMessage(result.data, "Không thể cập nhật trạng thái info"));
       setUpdatingIds((prev) => prev.filter((id) => id !== infoId));
@@ -137,9 +144,19 @@ export default function InfoListPage() {
     const updatedInfo = result.data?.info;
 
     if (updatedInfo) {
-      setInfos((prev) =>
-        prev.map((item) => (item.id === infoId ? { ...item, ...updatedInfo } : item))
-      );
+      setInfos((prev) => {
+        if (nextStatus) {
+          return prev.map((item) =>
+            item.id === infoId
+              ? { ...item, ...updatedInfo, status: true }
+              : { ...item, status: false }
+          );
+        }
+
+        return prev.map((item) =>
+          item.id === infoId ? { ...item, ...updatedInfo, status: false } : item
+        );
+      });
     }
 
     showPopup("success", getBackendMessage(result.data, "Cập nhật trạng thái info thành công"));

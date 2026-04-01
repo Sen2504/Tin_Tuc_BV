@@ -12,48 +12,108 @@ async function parseResponse(response) {
 
 // API PRIVATE quản trị
 export async function getBannerItemsApi() {
-  const response = await fetch(`${API_BASE_URL}/api/banner-items`, {
-    method: "GET",
-    credentials: "include",
-  });
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/banner-items`, {
+      method: "GET",
+      credentials: "include",
+    });
 
-  return parseResponse(response);
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
 }
 
-export async function getBannerItemByIdApi(itemId) {
-  const response = await fetch(`${API_BASE_URL}/api/banner-items/${itemId}`, {
-    method: "GET",
-    credentials: "include",
-  });
+export async function getBannerItemByIdApi(id) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/banner-items/${id}`, {
+      method: "GET",
+      credentials: "include",
+    });
 
-  return parseResponse(response);
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
 }
 
 export async function createBannerItemApi(formData) {
-  const response = await fetch(`${API_BASE_URL}/api/banner-items`, {
-    method: "POST",
-    credentials: "include",
-    body: formData,
-  });
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/banner-items`, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
 
-  return parseResponse(response);
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
 }
 
-export async function updateBannerItemApi(itemId, formData) {
-  const response = await fetch(`${API_BASE_URL}/api/banner-items/${itemId}`, {
-    method: "PUT",
-    credentials: "include",
-    body: formData,
-  });
+export async function updateBannerItemApi(id, formData) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/banner-items/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      body: formData,
+    });
 
-  return parseResponse(response);
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
 }
 
-export async function deleteBannerItemApi(itemId) {
-  const response = await fetch(`${API_BASE_URL}/api/banner-items/${itemId}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
+export async function deleteBannerItemApi(id) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/banner-items/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
 
-  return parseResponse(response);
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
 }

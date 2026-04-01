@@ -1,8 +1,11 @@
-from sqlalchemy.orm import joinedload
+import os
+
+from sqlalchemy.orm import joinedload, selectinload, load_only
 
 from app.extensions import db
 from app.models.banner import Banner
 from app.models.banner_item import BannerItem
+from app.models.media import Media
 from app.services.banner_item_service import BannerItemService
 
 
@@ -21,7 +24,16 @@ class BannerService:
         banners = (
             Banner.query
             .options(
-                joinedload(Banner.banner_items).joinedload(BannerItem.media)
+                load_only(Banner.id, Banner.status, Banner.create_at),
+                selectinload(Banner.banner_items)
+                .load_only(
+                    BannerItem.id,
+                    BannerItem.status,
+                    BannerItem.sort_order,
+                    BannerItem.media_id,
+                )
+                .selectinload(BannerItem.media)
+                .load_only(Media.file_path)
             )
             .order_by(Banner.id.desc())
             .all()
@@ -33,7 +45,22 @@ class BannerService:
         banner = (
             Banner.query
             .options(
-                joinedload(Banner.banner_items).joinedload(BannerItem.media)
+                load_only(
+                    Banner.id,
+                    Banner.status,
+                    Banner.create_at,
+                    Banner.update_at,
+                ),
+                joinedload(Banner.banner_items)
+                .load_only(
+                    BannerItem.id,
+                    BannerItem.url,
+                    BannerItem.sort_order,
+                    BannerItem.status,
+                    BannerItem.media_id,
+                )
+                .joinedload(BannerItem.media)
+                .load_only(Media.file_path)
             )
             .filter(Banner.id == banner_id)
             .first()
@@ -50,15 +77,75 @@ class BannerService:
             if status:
                 BannerService._deactivate_active_banners()
 
-            banner = Banner(
-                status=status
-            )
+            banner = Banner(status=status)
 
             db.session.add(banner)
             db.session.commit()
             return banner, None
         except Exception as e:
             db.session.rollback()
+            return None, str(e)
+
+    @staticmethod
+    def create_banner_full(status=True, items_data=None, files_map=None):
+        items_data = items_data or []
+        files_map = files_map or {}
+
+        if not items_data:
+            return None, "Phải có ít nhất 1 banner item"
+
+        saved_media_objects = []
+
+        try:
+            if status:
+                BannerService._deactivate_active_banners()
+
+            banner = Banner(status=status)
+            db.session.add(banner)
+            db.session.flush()
+
+            for item_data in items_data:
+                image_key = item_data["image_key"]
+                image_file = files_map.get(image_key)
+
+                if not image_file:
+                    raise ValueError(f"Thiếu file ảnh cho item: {image_key}")
+
+                media, error = BannerItemService._save_banner_image(image_file)
+                if error:
+                    raise ValueError(error)
+
+                db.session.add(media)
+                db.session.flush()
+                saved_media_objects.append(media)
+
+                banner_item = BannerItem(
+                    banner_id=banner.id,
+                    media_id=media.id,
+                    url=(item_data.get("url").strip() if isinstance(item_data.get("url"), str) and item_data.get("url").strip() else None),
+                    sort_order=item_data.get("sort_order", 0),
+                    status=item_data.get("status", True),
+                )
+
+                db.session.add(banner_item)
+
+            db.session.commit()
+
+            return {
+                "id": banner.id,
+                "status": banner.status,
+                "items_count": len(items_data),
+            }, None
+
+        except Exception as e:
+            db.session.rollback()
+
+            for media in saved_media_objects:
+                try:
+                    BannerItemService._delete_media_file(media)
+                except Exception:
+                    pass
+
             return None, str(e)
 
     @staticmethod

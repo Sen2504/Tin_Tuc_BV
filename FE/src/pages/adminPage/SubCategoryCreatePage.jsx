@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { getCategoriesApi } from "@/api/categoryApi";
+import { getCategoryOptionsApi } from "@/api/categoryApi";
 import { createSubCategoryApi } from "@/api/subcategoryApi";
 import ToastStack from "@/components/ToastStack";
 import { toSlugPreview } from "@/utils/slugPreview";
@@ -75,7 +75,7 @@ export default function SubCategoryCreatePage() {
   async function loadCategories() {
     setLoadingCategories(true);
 
-    const result = await getCategoriesApi();
+    const result = await getCategoryOptionsApi();
 
     if (!result.ok) {
       showPopup("error", getBackendMessage(result.data, "Không tải được category"));
@@ -185,7 +185,7 @@ export default function SubCategoryCreatePage() {
                 ))}
               </select>
             </div>
-            
+
             <div>
               <label
                 htmlFor="name"

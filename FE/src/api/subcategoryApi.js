@@ -145,3 +145,84 @@ export async function deleteSubCategoryApi(id) {
     };
   }
 }
+
+// API cho trang quản trị, trả về dữ liệu tổng hợp để hiển thị ở list subcategory
+export async function getSubCategoryListSummaryApi() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/subcategories/admin/list`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+export async function updateSubCategoryStatusApi(id, status) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/subcategories/${id}/status`, {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+export async function getSubcategoryOptionsApi(categoryId, options = {}) {
+  const params = new URLSearchParams();
+
+  if (categoryId) {
+    params.set("category_id", categoryId);
+  }
+
+  if (options.includeInactive) {
+    params.set("include_inactive", "true");
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/subcategories/admin/options${params.toString() ? `?${params.toString()}` : ""}`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}

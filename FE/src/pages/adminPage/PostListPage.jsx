@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import {
   deletePostApi,
   getPostByIdApi,
-  getPostsApi,
+  getPostAdminListApi,
   updatePostApi,
+  updatePostStatusApi
 } from "@/api/postApi";
 import ToastStack from "@/components/ToastStack";
 
@@ -80,7 +81,7 @@ export default function PostListPage() {
     setLoading(true);
     setMessage("");
 
-    const result = await getPostsApi({ includeInactive: true });
+    const result = await getPostAdminListApi({ includeInactive: true });
 
     if (!result.ok) {
       const errorMessage = getBackendMessage(result.data, "Cannot load posts");
@@ -90,7 +91,7 @@ export default function PostListPage() {
       return;
     }
 
-    setPosts(Array.isArray(result.data) ? result.data : []);
+    setPosts(result.data?.posts || []);
     setLoading(false);
   }
 
@@ -135,7 +136,7 @@ export default function PostListPage() {
       )
     );
 
-    const result = await updatePostApi(postId, { status: nextStatus });
+    const result = await updatePostStatusApi(postId, nextStatus);
 
     if (!result.ok) {
       setPosts((prev) =>
@@ -170,28 +171,11 @@ export default function PostListPage() {
     setUpdatingIds((prev) => prev.filter((id) => id !== postId));
   }
 
-  async function handleEdit(post) {
+  function handleEdit(post) {
     setOpeningEditId(post.id);
     setMessage("");
 
-    const result = await getPostByIdApi(post.id);
-
-    if (!result.ok) {
-      showPopup(
-        "error",
-        getBackendMessage(result.data, "Không lấy được chi tiết bài viết")
-      );
-      setOpeningEditId(null);
-      return;
-    }
-
-    navigate(`/post/update/${post.id}`, {
-      state: {
-        post: result.data?.post || null,
-      },
-    });
-
-    setOpeningEditId(null);
+    navigate(`/post/update/${post.id}`);
   }
 
   function handleOpenDeleteModal(post) {
@@ -286,8 +270,6 @@ export default function PostListPage() {
         String(post.id),
         post.title,
         post.slug,
-        post.hashtag,
-        post.excerpt,
         post.category?.name,
         post.subcategory?.name,
         post.author?.username,

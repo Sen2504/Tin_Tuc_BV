@@ -8,41 +8,159 @@ from marshmallow import ValidationError
 from app.schemas.category_schema import (
     CategoryCreateSchema,
     CategoryUpdateSchema,
-    CategoryResponseSchema,
     CategorySimpleResponseSchema,
     SubcategorySimpleResponseSchema,
     SubcategoryResponseSchema,
+    CategoryListSummaryResponseSchema,
+    CategoryOptionSchema,
+    CategoryEditResponseSchema,
 )
 
 category_bp = Blueprint("categories", __name__, url_prefix="/api/categories")
 
-
-create_category_schema = CategoryCreateSchema()
-update_category_schema = CategoryUpdateSchema()
-
-category_response_schema = CategoryResponseSchema()
 category_simple_response_schema = CategorySimpleResponseSchema()
 subcategory_simple_response_schema = SubcategorySimpleResponseSchema()
 subcategory_response_schema = SubcategoryResponseSchema()
+category_list_summary_response_schema = CategoryListSummaryResponseSchema(many=True)
+category_create_schema = CategoryCreateSchema()
+category_update_schema = CategoryUpdateSchema()
+category_option_schema = CategoryOptionSchema(many=True)
+category_edit_response_schema = CategoryEditResponseSchema()
 
 
-def parse_bool(value):
-    if isinstance(value, bool):
-        return value
+# ======================Các route của ADMIN
+# Route để lấy chi tiết 1 category theo id, dùng cho trang admin khi click vào 
+# 1 category để xem chi tiết và chỉnh sửa
+@category_bp.route("/<int:category_id>", methods=["GET"])
+@login_required
+def get_category(category_id):
+    category = CategoryService.get_category(category_id)
 
-    if isinstance(value, str):
-        value = value.strip().lower()
-        if value in {"true", "1", "yes", "on"}:
-            return True
-        if value in {"false", "0", "no", "off"}:
-            return False
+    if not category:
+        return jsonify({"error": "category not found"}), 404
 
-    if isinstance(value, int):
-        return bool(value)
+    return jsonify(category_edit_response_schema.dump(category))
 
-    return value
+# Route để lấy danh sách category dạng tóm tắt để hiển thị ra trang list
+@category_bp.route("/admin/list", methods=["GET"])
+@login_required
+def get_category_list_summary():
+    include_inactive = request.args.get("include_inactive", "").strip().lower() == "true"
 
-# Các route của ADMIN
+    categories = CategoryService.get_category_list_summary(
+        include_inactive=include_inactive
+    )
+
+    result = category_list_summary_response_schema.dump(categories)
+
+    return jsonify({
+        "categories": result
+    }), 200
+
+# Route để lấy danh sách category dạng options để hiển thị ra dropdown khi tạo/sửa category hoặc subcategory
+@category_bp.route("/admin/options", methods=["GET"])
+@login_required
+def get_category_options():
+    include_inactive = request.args.get("include_inactive", "").strip().lower() == "true"
+
+    categories, error = CategoryService.get_category_options(
+        include_inactive=include_inactive
+    )
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    return jsonify({
+        "categories": category_option_schema.dump(categories)
+    }), 200
+
+# Route để tạo mới 1 category
+@category_bp.route("", methods=["POST"])
+@login_required
+def create_category():
+    json_data = request.get_json() or {}
+
+    try:
+        validated_data = category_create_schema.load(json_data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+
+    category, error = CategoryService.create_category(
+        name=validated_data["name"],
+        description=validated_data.get("description"),
+        status=validated_data.get("status", True)
+    )
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    category_summary = CategoryService.get_category_summary_by_id(category.id)
+
+    return jsonify({
+        "message": "Danh mục đã được tạo",
+        "category": category_summary
+    }), 201
+
+# Route để cập nhật 1 category
+@category_bp.route("/<int:category_id>", methods=["PUT"])
+@login_required
+def update_category(category_id):
+    json_data = request.get_json() or {}
+
+    try:
+        validated_data = category_update_schema.load(json_data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+
+    updated_category, error = CategoryService.update_category(
+        category_id,
+        name=validated_data.get("name"),
+        description=validated_data.get("description"),
+        status=validated_data.get("status")
+    )
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    category_summary = CategoryService.get_category_summary_by_id(category_id)
+
+    return jsonify({
+        "message": "Danh mục đã được cập nhật",
+        "category": category_summary
+    }), 200
+
+# Route để xóa 1 category
+@category_bp.route("/<int:category_id>", methods=["DELETE"])
+@login_required
+def delete_category(category_id):
+    deleted, error = CategoryService.delete_category(category_id)
+
+    if error:
+        status_code = 404 if "not found" in error else 400
+        return jsonify({"error": error}), status_code
+
+    return jsonify({
+        "message": "Danh mục đã được xóa"
+    }), 200
+
+# ======================Các route PUBLIC ra giao diện
+# Route để lấy chi tiết 1 category theo slug, dùng cho trang categoryPage 
+# khi người dùng click vào 1 category để xem chi tiết và các subcategory của nó
+@category_bp.route("/<string:slug>/subcategories", methods=["GET"])
+def get_category_subcategories_by_slug(slug):
+    category = CategoryService.get_category_by_slug(slug)
+
+    if not category:
+        return jsonify({"error": "category not found"}), 404
+
+    active_subcategories = [s for s in category.subcategories if s.status]
+
+    return jsonify({
+        "category": category_simple_response_schema.dump(category),
+        "subcategories": subcategory_response_schema.dump(active_subcategories, many=True)
+    })
+
+# Route để lấy danh sách tất cả category ra trag UI client
 @category_bp.route("", methods=["GET"])
 @login_required
 def get_categories():
@@ -78,100 +196,3 @@ def get_categories():
         result.append(category_data)
 
     return jsonify({"categories": result})
-
-
-@category_bp.route("/<int:category_id>", methods=["GET"])
-@login_required
-def get_category(category_id):
-    category = CategoryService.get_category(category_id)
-
-    if not category:
-        return jsonify({"error": "category not found"}), 404
-
-    return jsonify(category_response_schema.dump(category))
-
-
-@category_bp.route("", methods=["POST"])
-@login_required
-def create_category():
-    data = request.get_json(silent=True) or {}
-
-    try:
-        validated_data = create_category_schema.load(data)
-    except ValidationError as err:
-        return jsonify({
-            "message": "Dữ liệu không hợp lệ",
-            "errors": err.messages
-        }), 400
-
-    category, error = CategoryService.create_category(
-        name=validated_data.get("name"),
-        description=validated_data.get("description"),
-        status=parse_bool(validated_data.get("status", True))
-    )
-
-    if error:
-        return jsonify({"error": error}), 400
-
-    return jsonify({
-        "message": "Danh mục đã được tạo",
-        "category": category_response_schema.dump(category)
-    }), 201
-
-
-@category_bp.route("/<int:category_id>", methods=["PUT"])
-@login_required
-def update_category(category_id):
-    data = request.get_json(silent=True) or {}
-
-    try:
-        validated_data = update_category_schema.load(data)
-    except ValidationError as err:
-        return jsonify({
-            "message": "Dữ liệu không hợp lệ",
-            "errors": err.messages
-        }), 400
-
-    category, error = CategoryService.update_category(
-        category_id=category_id,
-        name=validated_data.get("name"),
-        description=validated_data.get("description"),
-        status=parse_bool(validated_data["status"]) if "status" in validated_data else None
-    )
-
-    if error:
-        status_code = 404 if "not found" in error else 400
-        return jsonify({"error": error}), status_code
-
-    return jsonify({
-        "message": "Danh mục đã được cập nhật",
-        "category": category_response_schema.dump(category)
-    })
-
-@category_bp.route("/<int:category_id>", methods=["DELETE"])
-@login_required
-def delete_category(category_id):
-    deleted, error = CategoryService.delete_category(category_id)
-
-    if error:
-        status_code = 404 if "not found" in error else 400
-        return jsonify({"error": error}), status_code
-
-    return jsonify({
-        "message": "Danh mục đã được xóa"
-    }), 200
-
-# Các route PUBLIC ra giao diện
-@category_bp.route("/<string:slug>/subcategories", methods=["GET"])
-def get_category_subcategories_by_slug(slug):
-    category = CategoryService.get_category_by_slug(slug)
-
-    if not category:
-        return jsonify({"error": "category not found"}), 404
-
-    active_subcategories = [s for s in category.subcategories if s.status]
-
-    return jsonify({
-        "category": category_simple_response_schema.dump(category),
-        "subcategories": subcategory_response_schema.dump(active_subcategories, many=True)
-    })

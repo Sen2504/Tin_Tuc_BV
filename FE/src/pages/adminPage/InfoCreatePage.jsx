@@ -1,13 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { createInfoApi, deleteInfoApi } from "@/api/infoApi";
 import { createInfoStatApi } from "@/api/info_statApi";
-import {
-  AlertCircle,
-  CheckCircle2,
-  ImagePlus,
-  Layers,
-  Sparkles,
-} from "lucide-react";
+import ToastStack from "@/components/ToastStack";
+import { ImagePlus, Layers, Sparkles } from "lucide-react";
 
 const initialStatItem = {
   label: "",
@@ -16,6 +12,8 @@ const initialStatItem = {
 };
 
 export default function InfoCreatePage() {
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     title: "",
     slogan: "",
@@ -27,8 +25,37 @@ export default function InfoCreatePage() {
   const [infoStats, setInfoStats] = useState([{ ...initialStatItem }]);
   const [previewImage, setPreviewImage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [errorText, setErrorText] = useState("");
+  const [toasts, setToasts] = useState([]);
+
+  const showPopup = useCallback((type, message, duration = 2000) => {
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type,
+        message,
+        duration,
+      },
+    ]);
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  const getBackendMessage = useCallback((data, fallback = "Có lỗi xảy ra") => {
+    if (data?.message) return data.message;
+    if (data?.error) return data.error;
+
+    if (data?.errors) {
+      const firstField = Object.keys(data.errors)[0];
+      if (firstField && Array.isArray(data.errors[firstField])) {
+        return data.errors[firstField][0];
+      }
+    }
+
+    return fallback;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -86,8 +113,6 @@ export default function InfoCreatePage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
-    setMessage("");
-    setErrorText("");
 
     try {
       const filteredStats = infoStats.filter(
@@ -105,11 +130,7 @@ export default function InfoCreatePage() {
       const createInfoRes = await createInfoApi(infoPayload);
 
       if (!createInfoRes.ok) {
-        setErrorText(
-          createInfoRes.data?.message ||
-            createInfoRes.data?.error ||
-            "Tạo info thất bại"
-        );
+        showPopup("error", getBackendMessage(createInfoRes.data, "Tạo info thất bại"), 2000);
         setLoading(false);
         return;
       }
@@ -118,7 +139,7 @@ export default function InfoCreatePage() {
       const infoId = createdInfo?.id;
 
       if (!infoId) {
-        setErrorText("Không lấy được ID của info vừa tạo");
+        showPopup("error", "Không lấy được ID của info vừa tạo", 2000);
         setLoading(false);
         return;
       }
@@ -134,17 +155,21 @@ export default function InfoCreatePage() {
         if (!createStatRes.ok) {
           await deleteInfoApi(infoId);
 
-          setErrorText(
-            createStatRes.data?.message ||
-              createStatRes.data?.error ||
-              "Tạo info_stat thất bại"
+          showPopup(
+            "error",
+            getBackendMessage(createStatRes.data, "Tạo info_stat thất bại"),
+            2000
           );
           setLoading(false);
           return;
         }
       }
 
-      setMessage("Tạo info và info_stat thành công");
+      showPopup(
+        "success",
+        getBackendMessage(createInfoRes.data, "Tạo info thành công"),
+        2000
+      );
 
       setForm({
         title: "",
@@ -161,30 +186,34 @@ export default function InfoCreatePage() {
       if (fileInput) {
         fileInput.value = "";
       }
+
+      setTimeout(() => {
+        navigate("/info/list");
+      }, 2000);
     } catch (error) {
-      setErrorText("Có lỗi xảy ra trong quá trình tạo dữ liệu");
+      showPopup("error", "Có lỗi xảy ra trong quá trình tạo dữ liệu", 2000);
     }
 
     setLoading(false);
   }
 
-  const activeStatCount = useMemo(() => {
-    return infoStats.filter((item) => item.status).length;
-  }, [infoStats]);
+  // const activeStatCount = useMemo(() => {
+  //   return infoStats.filter((item) => item.status).length;
+  // }, [infoStats]);
 
-  const filledStatCount = useMemo(() => {
-    return infoStats.filter(
-      (item) => item.label.trim() !== "" && item.value.trim() !== ""
-    ).length;
-  }, [infoStats]);
+  // const filledStatCount = useMemo(() => {
+  //   return infoStats.filter(
+  //     (item) => item.label.trim() !== "" && item.value.trim() !== ""
+  //   ).length;
+  // }, [infoStats]);
 
-  const completionPercent = useMemo(() => {
-    let score = 0;
-    if (form.title.trim()) score += 34;
-    if (form.description.trim()) score += 33;
-    if (filledStatCount > 0) score += 33;
-    return score;
-  }, [form.title, form.description, filledStatCount]);
+  // const completionPercent = useMemo(() => {
+  //   let score = 0;
+  //   if (form.title.trim()) score += 34;
+  //   if (form.description.trim()) score += 33;
+  //   if (filledStatCount > 0) score += 33;
+  //   return score;
+  // }, [form.title, form.description, filledStatCount]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#cffafe,_#f8fafc_35%,_#f8fafc)] px-4 py-6 sm:px-6 lg:px-8">
@@ -474,6 +503,7 @@ export default function InfoCreatePage() {
           </div>
         </form>
       </div>
+      <ToastStack toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }

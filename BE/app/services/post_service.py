@@ -6,6 +6,7 @@ from app.models.media import Media
 from app.models.post import Post
 from app.models.media_post import PostMedia
 from app.models.sub_category import SubCategory
+from app.models.user import User
 from sqlalchemy.orm import joinedload
 import unicodedata
 import os
@@ -624,3 +625,65 @@ class PostService:
         except Exception as e:
             db.session.rollback()
             return False, str(e)
+        
+# ========================================
+    @staticmethod
+    def get_post_admin_list():
+        rows = (
+            db.session.query(
+                Post.id.label("id"),
+                Post.title.label("title"),
+                Post.slug.label("slug"),
+                Post.status.label("status"),
+                Post.create_at.label("create_at"),
+                Post.update_at.label("update_at"),
+                User.username.label("author_username"),
+                Category.id.label("category_id"),
+                Category.name.label("category_name"),
+                SubCategory.id.label("subcategory_id"),
+                SubCategory.name.label("subcategory_name"),
+            )
+            .join(SubCategory, Post.subcategory_id == SubCategory.id)
+            .join(Category, SubCategory.category_id == Category.id)
+            .join(User, Post.user_id == User.id)
+            .order_by(Post.id.desc())
+            .all()
+        )
+
+        return [
+            {
+                "id": row.id,
+                "title": row.title,
+                "slug": row.slug,
+                "status": row.status,
+                "create_at": row.create_at.isoformat() if row.create_at else None,
+                "update_at": row.update_at.isoformat() if row.update_at else None,
+                "author": {
+                    "username": row.author_username,
+                } if row.author_username else None,
+                "category": {
+                    "id": row.category_id,
+                    "name": row.category_name,
+                } if row.category_id else None,
+                "subcategory": {
+                    "id": row.subcategory_id,
+                    "name": row.subcategory_name,
+                } if row.subcategory_id else None,
+            }
+            for row in rows
+        ], None
+    
+    @staticmethod
+    def update_post_status(post_id, status):
+        post = Post.query.filter(Post.id == post_id).first()
+
+        if not post:
+            return None, "post not found"
+
+        try:
+            post.status = status
+            db.session.commit()
+            return post, None
+        except Exception as e:
+            db.session.rollback()
+            return None, str(e)

@@ -7,10 +7,20 @@ from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models.info import Info
 from app.schemas.info_schema import parse_bool
+from sqlalchemy.orm import load_only
 
 
 class InfoService:
     ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
+
+    @staticmethod
+    def _deactivate_other_active_infos(exclude_id=None):
+        query = Info.query.filter(Info.status.is_(True))
+
+        if exclude_id is not None:
+            query = query.filter(Info.id != exclude_id)
+
+        query.update({Info.status: False}, synchronize_session=False)
 
     @staticmethod
     def _allowed_image(filename: str) -> bool:
@@ -72,6 +82,17 @@ class InfoService:
         return query.all()
 
     @staticmethod
+    def get_all_for_list(include_inactive=False):
+        query = Info.query.options(
+            load_only(Info.id, Info.title, Info.status)
+        ).order_by(Info.id.asc())
+
+        if not include_inactive:
+            query = query.filter(Info.status.is_(True))
+
+        return query.all()
+
+    @staticmethod
     def get_by_id(info_id):
         return Info.query.filter(Info.id == info_id).first()
 
@@ -84,12 +105,17 @@ class InfoService:
             if error:
                 return None, error
 
+        is_active = parse_bool(data.get("status", True))
+
+        if is_active:
+            InfoService._deactivate_other_active_infos()
+
         info = Info(
             title=data["title"].strip(),
             slogan=data.get("slogan").strip() if isinstance(data.get("slogan"), str) else data.get("slogan"),
             description=data.get("description"),
             image=image_path,
-            status=parse_bool(data.get("status", True))
+            status=is_active
         )
 
         db.session.add(info)
@@ -116,7 +142,10 @@ class InfoService:
             info.description = data.get("description")
 
         if "status" in data:
-            info.status = parse_bool(data["status"])
+            next_status = parse_bool(data["status"])
+            if next_status:
+                InfoService._deactivate_other_active_infos(exclude_id=info_id)
+            info.status = next_status
 
         new_image_path = None
 
@@ -144,7 +173,7 @@ class InfoService:
     def delete_info(info_id):
         info = Info.query.filter(Info.id == info_id).first()
         if not info:
-            return False, "Không tìm thấy item slider"
+            return "Không tìm thấy item slider"
 
         old_image_path = info.image
 
@@ -154,4 +183,19 @@ class InfoService:
         if old_image_path:
             InfoService._delete_physical_file(old_image_path)
 
-        return True, None
+        return None
+    
+    @staticmethod
+    def update_info_status(info_id, status):
+        info = Info.query.filter(Info.id == info_id).first()
+        if not info:
+            return None, "Không tìm thấy item slider"
+
+        next_status = parse_bool(status)
+        if next_status:
+            InfoService._deactivate_other_active_infos(exclude_id=info_id)
+
+        info.status = next_status
+        db.session.commit()
+
+        return info, None

@@ -181,3 +181,48 @@ class SubCategorySimpleResponseSchema(Schema):
     status = fields.Boolean()
     category_id = fields.Integer()
     thumbnail_media_id = fields.Integer(allow_none=True)
+
+# ======================== Mới thêm để trả về dữ liệu tổng hợp cho trang quản trị ========================
+class SubCategoryListItemSchema(Schema):
+    id = fields.Integer()
+    name = fields.String()
+    status = fields.Boolean()
+    category_name = fields.String(allow_none=True)
+    posts_count = fields.Integer()
+
+class SubCategoryStatusResponseSchema(Schema):
+    id = fields.Integer()
+    status = fields.Boolean()
+
+class SubCategoryCreateResponseSchema(Schema):
+    id = fields.Integer()
+    name = fields.String()
+    status = fields.Boolean()
+    category_id = fields.Integer()
+
+class SubCategoryUpdateResponseSchema(Schema):
+    id = fields.Integer()
+    name = fields.String()
+    status = fields.Boolean()
+    category_id = fields.Integer()
+
+# Đây là schemas để dump dữ liệu danh sách các subcategory cho trang post dùng
+# ở phần dropdown chọn subcategory khi tạo/sửa post, chỉ cần id, name
+class SubCategoryOptionSchema(Schema):
+    id = fields.Integer()
+    name = fields.String()
+
+class MediaSimpleResponseSchema(Schema):
+    id = fields.Integer()
+    file_path = fields.String()
+    file_name = fields.String()
+    original_name = fields.String()
+
+
+class SubCategoryEditResponseSchema(Schema):
+    id = fields.Integer()
+    name = fields.String()
+    description = fields.String(allow_none=True)
+    status = fields.Boolean()
+    category_id = fields.Integer()
+    thumbnail = fields.Nested(MediaSimpleResponseSchema, attribute="thumbnail_media", allow_none=True)

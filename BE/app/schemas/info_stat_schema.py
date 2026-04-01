@@ -96,3 +96,27 @@ class InfoStatUpdateSchema(Schema):
     @validates("status")
     def validate_status(self, value, **kwargs):
         parse_bool(value)
+
+class InfoStatCreateResponseSchema(Schema):
+    id = fields.Integer()
+    label = fields.String()
+    status = fields.Boolean()
+
+
+class InfoStatUpdateResponseSchema(Schema):
+    id = fields.Integer()
+    label = fields.String()
+    status = fields.Boolean()
+
+class InfoStatResponseSchema(Schema):
+    id = fields.Integer()
+    label = fields.String()
+    value = fields.String()
+    status = fields.Boolean()
+
+class InfoStatUIResponseSchema(Schema):
+    id = fields.Integer()
+    label = fields.String()
+    value = fields.String()
+    status = fields.Boolean()
+    info_id = fields.Integer()

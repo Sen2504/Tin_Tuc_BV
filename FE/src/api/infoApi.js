@@ -169,3 +169,52 @@ export async function deleteInfoApi(id) {
     };
   }
 }
+
+export async function getInfoListApi(includeInactive = true) {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/infos/list?include_inactive=${includeInactive}`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+export async function updateInfoStatusApi(id, status) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/infos/${id}/status`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}

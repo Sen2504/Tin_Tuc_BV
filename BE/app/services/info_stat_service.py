@@ -63,8 +63,8 @@ class InfoStatService:
     def delete_info_stat(stat_id):
         stat = InfoStat.query.filter(InfoStat.id == stat_id).first()
         if not stat:
-            return False, "Không tìm thấy info_stat"
+            return "Không tìm thấy info_stat"
 
         db.session.delete(stat)
         db.session.commit()
-        return True, None
+        return None

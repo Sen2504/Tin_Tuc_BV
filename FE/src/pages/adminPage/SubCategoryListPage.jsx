@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 
 import {
   deleteSubCategoryApi,
-  getSubCategoriesApi,
   updateSubCategoryApi,
+  getSubCategoryListSummaryApi,
+  updateSubCategoryStatusApi,
 } from "@/api/subcategoryApi";
 import ToastStack from "@/components/ToastStack";
 
@@ -67,7 +68,7 @@ export default function SubCategoryListPage() {
   async function loadSubCategories() {
     setLoading(true);
 
-    const result = await getSubCategoriesApi();
+    const result = await getSubCategoryListSummaryApi();
 
     if (!result.ok) {
       showPopup("error", getBackendMessage(result.data, "Cannot load subcategories"));
@@ -133,7 +134,7 @@ export default function SubCategoryListPage() {
       )
     );
 
-    const result = await updateSubCategoryApi(subcategoryId, { status: nextStatus });
+    const result = await updateSubCategoryStatusApi(subcategoryId, nextStatus);
 
     if (!result.ok) {
       setSubcategories((prev) =>

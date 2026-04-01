@@ -5,7 +5,13 @@ from marshmallow import ValidationError
 from app.schemas.subcategory_schema import (
     SubCategoryCreateSchema,
     SubCategoryUpdateSchema,
-    SubCategoryResponseSchema,
+    # ======================= Mới thêm để trả về dữ liệu tổng hợp cho trang quản trị ========================
+    SubCategoryListItemSchema,
+    SubCategoryStatusResponseSchema,
+    SubCategoryCreateResponseSchema,
+    SubCategoryUpdateResponseSchema,
+    SubCategoryOptionSchema,
+    SubCategoryEditResponseSchema,
 )
 
 subcategory_bp = Blueprint(
@@ -14,8 +20,13 @@ subcategory_bp = Blueprint(
 
 create_subcategory_schema = SubCategoryCreateSchema()
 update_subcategory_schema = SubCategoryUpdateSchema()
-subcategory_response_schema = SubCategoryResponseSchema()
-subcategories_response_schema = SubCategoryResponseSchema(many=True)
+# ======================= Mới thêm để trả về dữ liệu tổng hợp cho trang quản trị ========================
+subcategory_list_item_schema = SubCategoryListItemSchema(many=True)
+subcategory_status_response_schema = SubCategoryStatusResponseSchema()
+subcategory_create_response_schema = SubCategoryCreateResponseSchema()
+subcategory_update_response_schema = SubCategoryUpdateResponseSchema()
+subcategory_option_schema = SubCategoryOptionSchema(many=True)
+subcategory_edit_response_schema = SubCategoryEditResponseSchema()
 
 def parse_bool(value):
     if value is None or value == "":
@@ -51,47 +62,8 @@ def parse_int(value, field_name="id"):
 
     raise ValidationError(f"{field_name} phải là số nguyên")
 
-
-# def serialize_media(media):
-#     if not media:
-#         return None
-
-#     return {
-#         "id": media.id,
-#         "original_name": media.original_name,
-#         "file_name": media.file_name,
-#         "file_path": media.file_path,
-#         "mime_type": media.mime_type,
-#         "file_size": media.file_size,
-#         "caption": media.caption,
-#     }
-
-
-# def serialize_subcategory(subcategory):
-#     return {
-#         "id": subcategory.id,
-#         "name": subcategory.name,
-#         "slug": subcategory.slug,
-#         "description": subcategory.description,
-#         "status": subcategory.status,
-#         "category_id": subcategory.category_id,
-#         "category_name": subcategory.category.name if subcategory.category else None,
-#         "thumbnail_media_id": subcategory.thumbnail_media_id,
-#         "thumbnail": serialize_media(subcategory.thumbnail_media),
-#     }
-
-
-# Các route của ADMIN
-@subcategory_bp.route("", methods=["GET"])
-@login_required
-def get_subcategories():
-    subcategories = SubCategoryService.get_subcategories()
-
-    return jsonify({
-        "subcategories": subcategories_response_schema.dump(subcategories)
-    })
-
-
+# Route để lấy chi tiết 1 subcategory theo id, dùng cho trang admin khi click vào 
+# 1 subcategory để xem chi tiết và chỉnh sửa
 @subcategory_bp.route("/<int:subcategory_id>", methods=["GET"])
 @login_required
 def get_subcategory(subcategory_id):
@@ -100,9 +72,9 @@ def get_subcategory(subcategory_id):
     if not subcategory:
         return jsonify({"error": "subcategory not found"}), 404
 
-    return jsonify(subcategory_response_schema.dump(subcategory))
+    return jsonify(subcategory_edit_response_schema.dump(subcategory))
 
-
+# Route để tạo mới 1 subcategory ở trang admin
 @subcategory_bp.route("", methods=["POST"])
 @login_required
 def create_subcategory():
@@ -130,10 +102,11 @@ def create_subcategory():
 
     return jsonify({
         "message": "Danh mục con đã được tạo",
-        "subcategory": subcategory_response_schema.dump(subcategory)
+        "subcategory": subcategory_create_response_schema.dump(subcategory)
     }), 201
 
-
+# Route để cập nhật 1 subcategory ở trang admin
+# có thể cập nhật cả thumbnail và các trường thông tin khác
 @subcategory_bp.route("/<int:subcategory_id>", methods=["PUT"])
 @login_required
 def update_subcategory(subcategory_id):
@@ -164,10 +137,10 @@ def update_subcategory(subcategory_id):
 
     return jsonify({
         "message": "Danh mục con đã được cập nhật",
-        "subcategory": subcategory_response_schema.dump(subcategory)
+        "subcategory": subcategory_update_response_schema.dump(subcategory)
     })
 
-
+# Route để xóa 1 subcategory ở trang admin
 @subcategory_bp.route("/<int:subcategory_id>", methods=["DELETE"])
 @login_required
 def delete_subcategory(subcategory_id):
@@ -179,4 +152,87 @@ def delete_subcategory(subcategory_id):
 
     return jsonify({
         "message": "Danh mục con đã được xóa"
+    }), 200
+
+# ======================= Mới thêm để trả về dữ liệu tổng hợp cho trang quản trị ========================
+# Route để lấy danh sách subcategory kèm thông tin category cha
+# dùng cho trang admin ở phần quản lý subcategory
+@subcategory_bp.route("/admin/list", methods=["GET"])
+@login_required
+def get_subcategory_list_summary():
+    include_inactive = request.args.get("include_inactive", "false").lower() == "true"
+    subcategory_summaries = SubCategoryService.get_subcategory_list_summary(include_inactive=include_inactive)
+
+    return jsonify({
+        "subcategories": subcategory_list_item_schema.dump(subcategory_summaries)
+    })
+
+# Route để cập nhật trạng thái của subcategory ở trang list
+@subcategory_bp.route("/<int:subcategory_id>/status", methods=["PUT"])
+@login_required
+def update_subcategory_status(subcategory_id):
+    data = request.get_json(silent=True) or {}
+
+    status_value = data.get("status")
+
+    try:
+        parsed_status = parse_bool(status_value)
+    except ValidationError as err:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": {
+                "status": [str(err)]
+            }
+        }), 400
+
+    if parsed_status is None:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": {
+                "status": ["status là bắt buộc"]
+            }
+        }), 400
+
+    subcategory, error = SubCategoryService.update_subcategory_status(
+        subcategory_id=subcategory_id,
+        status=parsed_status
+    )
+
+    if error:
+        status_code = 404 if "không tìm thấy" in error.lower() else 400
+        return jsonify({"error": error}), status_code
+
+    return jsonify({
+        "message": "Danh mục con đã được cập nhật trạng thái",
+        "subcategory": subcategory_status_response_schema.dump(subcategory)
+    })
+
+# Route để lấy options subcategory theo category_id
+# dùng cho dropdown khi tạo/sửa bài viết
+@subcategory_bp.route("/admin/options", methods=["GET"])
+@login_required
+def get_subcategory_options():
+    raw_category_id = request.args.get("category_id")
+    include_inactive = request.args.get("include_inactive", "").strip().lower() == "true"
+
+    try:
+        category_id = parse_int(raw_category_id, "category_id")
+    except ValidationError as err:
+        return jsonify({
+            "message": "Dữ liệu không hợp lệ",
+            "errors": {
+                "category_id": [str(err)]
+            }
+        }), 400
+
+    subcategories, error = SubCategoryService.get_subcategory_options(
+        category_id=category_id,
+        include_inactive=include_inactive
+    )
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    return jsonify({
+        "subcategories": subcategory_option_schema.dump(subcategories)
     }), 200

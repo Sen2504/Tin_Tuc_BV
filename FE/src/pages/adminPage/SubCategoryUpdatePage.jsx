@@ -5,7 +5,7 @@ import {
   updateSubCategoryApi,
   getSubCategoryByIdApi,
 } from "@/api/subcategoryApi";
-import { getCategoriesApi } from "@/api/categoryApi";
+import { getCategoryOptionsApi } from "@/api/categoryApi";
 import ToastStack from "@/components/ToastStack";
 import { toSlugPreview } from "@/utils/slugPreview";
 
@@ -89,7 +89,7 @@ export default function SubCategoryUpdatePage() {
     try {
       setLoadingCategories(true);
 
-      const result = await getCategoriesApi();
+      const result = await getCategoryOptionsApi();
 
       if (!result.ok) {
         showPopup(

@@ -104,7 +104,11 @@ def create_banner_item():
 
     return jsonify({
         "message": "Tạo banner item thành công",
-        "banner_item": banner_item_response_schema.dump(item)
+        "banner_item": {
+            "id": item.id,
+            "banner_id": item.banner_id,
+            "file_path": item.media.file_path if item.media else None,
+        }
     }), 201
 
 

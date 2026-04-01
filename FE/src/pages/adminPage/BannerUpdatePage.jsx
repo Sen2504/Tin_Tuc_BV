@@ -15,6 +15,7 @@ const API_ORIGIN =
 
 const initialBannerForm = {
   status: true,
+  originalStatus: true,
 };
 
 const createEmptyItem = (sortOrder = 0) => ({
@@ -26,6 +27,10 @@ const createEmptyItem = (sortOrder = 0) => ({
   url: "",
   sort_order: sortOrder,
   status: true,
+
+  originalUrl: "",
+  originalSortOrder: sortOrder,
+  originalStatus: true,
 });
 
 function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
@@ -63,6 +68,35 @@ function buildImageUrl(path) {
   return `${API_ORIGIN}${path}`;
 }
 
+function isExistingItemChanged(item) {
+  if (!item?.id) return false;
+
+  const currentUrl = item.url || "";
+  const originalUrl = item.originalUrl || "";
+
+  const currentSortOrder =
+    item.sort_order === "" || item.sort_order === null
+      ? 0
+      : Number(item.sort_order);
+
+  const originalSortOrder =
+    item.originalSortOrder === "" || item.originalSortOrder === null
+      ? 0
+      : Number(item.originalSortOrder);
+
+  const currentStatus = Boolean(item.status);
+  const originalStatus = Boolean(item.originalStatus);
+
+  const changedImage = Boolean(item.image);
+
+  return (
+    currentUrl !== originalUrl ||
+    currentSortOrder !== originalSortOrder ||
+    currentStatus !== originalStatus ||
+    changedImage
+  );
+}
+
 export default function BannerUpdatePage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -74,7 +108,6 @@ export default function BannerUpdatePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const [toasts, setToasts] = useState([]);
 
   const showPopup = useCallback((type, message, duration = 2200) => {
@@ -101,7 +134,6 @@ export default function BannerUpdatePage() {
   async function loadBanner() {
     setLoading(true);
     setErrorMessage("");
-    setSuccessMessage("");
 
     const result = await getBannerByIdApi(id);
 
@@ -131,6 +163,10 @@ export default function BannerUpdatePage() {
         url: item.url || "",
         sort_order: item.sort_order ?? index,
         status: Boolean(item.status),
+
+        originalUrl: item.url || "",
+        originalSortOrder: item.sort_order ?? index,
+        originalStatus: Boolean(item.status),
       };
     });
 
@@ -142,6 +178,7 @@ export default function BannerUpdatePage() {
 
     setBannerForm({
       status: Boolean(loadedBanner.status),
+      originalStatus: Boolean(loadedBanner.status),
     });
 
     setItems(loadedItems.length > 0 ? loadedItems : [createEmptyItem(0)]);
@@ -212,7 +249,6 @@ export default function BannerUpdatePage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMessage("");
-    setSuccessMessage("");
 
     if (!bannerMeta?.id) {
       setErrorMessage("Không tìm thấy ID banner để cập nhật");
@@ -237,14 +273,22 @@ export default function BannerUpdatePage() {
     setSubmitting(true);
 
     try {
-      const bannerResult = await updateBannerApi(bannerMeta.id, {
-        status: bannerForm.status,
-      });
+      let backendSuccessMessage = "";
 
-      if (!bannerResult.ok) {
-        setErrorMessage(getBackendMessage(bannerResult.data, "Cập nhật banner thất bại"));
-        setSubmitting(false);
-        return;
+      if (bannerForm.status !== bannerForm.originalStatus) {
+        const bannerResult = await updateBannerApi(bannerMeta.id, {
+          status: bannerForm.status,
+        });
+
+        if (!bannerResult.ok) {
+          setErrorMessage(
+            getBackendMessage(bannerResult.data, "Cập nhật banner thất bại")
+          );
+          setSubmitting(false);
+          return;
+        }
+
+        backendSuccessMessage = bannerResult.data?.message || backendSuccessMessage;
       }
 
       for (const itemId of deletedItemIds) {
@@ -255,9 +299,18 @@ export default function BannerUpdatePage() {
           setSubmitting(false);
           return;
         }
+
+        backendSuccessMessage = deleteResult.data?.message || backendSuccessMessage;
       }
 
       for (const item of items) {
+        const isNewItem = !item.id;
+        const shouldUpdateExistingItem = item.id && isExistingItemChanged(item);
+
+        if (!isNewItem && !shouldUpdateExistingItem) {
+          continue;
+        }
+
         const formData = new FormData();
         formData.append("banner_id", bannerMeta.id);
         formData.append("url", item.url || "");
@@ -268,25 +321,30 @@ export default function BannerUpdatePage() {
           formData.append("image", item.image);
         }
 
-        const itemResult = item.id
-          ? await updateBannerItemApi(item.id, formData)
-          : await createBannerItemApi(formData);
+        const itemResult = isNewItem
+          ? await createBannerItemApi(formData)
+          : await updateBannerItemApi(item.id, formData);
 
         if (!itemResult.ok) {
           setErrorMessage(
             getBackendMessage(
               itemResult.data,
-              item.id ? "Cập nhật banner item thất bại" : "Tạo banner item thất bại"
+              isNewItem ? "Tạo banner item thất bại" : "Cập nhật banner item thất bại"
             )
           );
           setSubmitting(false);
           return;
         }
+
+        backendSuccessMessage = itemResult.data?.message || backendSuccessMessage;
       }
 
-      setSuccessMessage("Cập nhật banner thành công");
-      showPopup("success", "Cập nhật banner thành công");
-      await loadBanner();
+      const successText = backendSuccessMessage || "Cập nhật banner thành công";
+      showPopup("success", successText, 1400);
+
+      window.setTimeout(() => {
+        navigate("/banner/list");
+      }, 900);
     } catch {
       setErrorMessage("Có lỗi xảy ra khi cập nhật banner");
     } finally {
@@ -318,12 +376,6 @@ export default function BannerUpdatePage() {
           {errorMessage ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               {errorMessage}
-            </div>
-          ) : null}
-
-          {successMessage ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-              {successMessage}
             </div>
           ) : null}
 

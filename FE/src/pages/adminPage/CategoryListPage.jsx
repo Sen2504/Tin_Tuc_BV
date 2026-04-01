@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  getCategoriesApi,
+  getCategoryListSummaryApi,
   updateCategoryApi,
   deleteCategoryApi,
 } from "@/api/categoryApi";
+
 import ToastStack from "@/components/ToastStack";
 
 function getBackendMessage(data, fallback = "Có lỗi xảy ra") {
@@ -65,7 +66,7 @@ export default function CategoryListPage() {
     setLoading(true);
     setMessage("");
 
-    const result = await getCategoriesApi({ includeInactive: true });
+    const result = await getCategoryListSummaryApi({ includeInactive: true });
 
     if (!result.ok) {
       setMessage(getBackendMessage(result.data, "Cannot load categories"));
@@ -362,14 +363,8 @@ export default function CategoryListPage() {
                       const isUpdating = updatingIds.includes(category.id);
                       const isDeletingRow = deletingIds.includes(category.id);
                       const descriptionText = category.description || "Chưa có mô tả.";
-                      const subcategoriesCount = Number.isFinite(category.subcategories_count)
-                        ? category.subcategories_count
-                        : Array.isArray(category.subcategories)
-                          ? category.subcategories.length
-                          : 0;
-                      const postsCount = Number.isFinite(category.posts_count)
-                        ? category.posts_count
-                        : 0;
+                      const subcategoriesCount = Number(category.subcategories_count || 0);
+                      const postsCount = Number(category.posts_count || 0);
 
                       return (
                         <tr key={category.id} className="transition hover:bg-slate-50/80">

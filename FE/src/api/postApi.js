@@ -118,3 +118,50 @@ export async function getPostsApi(options = {}) {
     };
   }
 }
+
+// API cho trang quản trị, trả về dữ liệu tổng hợp để hiển thị ở list post
+export async function getPostAdminListApi() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/posts/admin/list`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}
+
+export async function updatePostStatusApi(postId, status) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/status`, {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    const data = await res.json();
+
+    return {
+      ok: res.ok,
+      data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      data: { error: "Server connection error" },
+    };
+  }
+}

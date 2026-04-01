@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PostEditor from "@/components/PostEditor";
 import ToastStack from "@/components/ToastStack";
-import { getCategoriesApi } from "@/api/categoryApi";
+import { getCategoryOptionsApi } from "@/api/categoryApi";
+import { getSubcategoryOptionsApi } from "@/api/subcategoryApi";
 import { getPostByIdApi, updatePostApi } from "@/api/postApi";
 
 const API_ORIGIN =
@@ -35,22 +36,6 @@ function toSlugPreview(value = "") {
     .trim()
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
-}
-
-function findCategoryIdBySubcategoryId(categories, subcategoryId) {
-  if (!subcategoryId) return "";
-
-  for (const category of categories) {
-    const found = (category.subcategories || []).find(
-      (sub) => String(sub.id) === String(subcategoryId)
-    );
-
-    if (found) {
-      return String(category.id);
-    }
-  }
-
-  return "";
 }
 
 function normalizeHashtagToken(value = "") {
@@ -98,6 +83,7 @@ export default function PostUpdatePage() {
   const [isCategoryUnlocked, setIsCategoryUnlocked] = useState(false);
   const [isSubcategoryUnlocked, setIsSubcategoryUnlocked] = useState(false);
   const [hashtagInput, setHashtagInput] = useState("");
+  const [subcategories, setSubcategories] = useState([]);
 
   const [form, setForm] = useState({
     title: "",
@@ -149,30 +135,26 @@ export default function PostUpdatePage() {
 
   const slugPreview = useMemo(() => toSlugPreview(form.title), [form.title]);
 
-  const subcategories = useMemo(() => {
-    const category = categories.find(
-      (c) => String(c.id) === String(selectedCategoryId)
-    );
-    return category?.subcategories || [];
-  }, [categories, selectedCategoryId]);
+  async function loadSubcategories(categoryId) {
+    if (!categoryId) {
+      setSubcategories([]);
+      return [];
+    }
 
-  const selectedCategoryName = useMemo(
-    () =>
-      categories.find((c) => String(c.id) === String(selectedCategoryId))
-        ?.name ||
-      postMeta?.category?.name ||
-      "—",
-    [categories, selectedCategoryId, postMeta]
-  );
+    const result = await getSubcategoryOptionsApi(categoryId, {
+      includeInactive: true,
+    });
 
-  const selectedSubcategoryName = useMemo(
-    () =>
-      subcategories.find((s) => String(s.id) === String(selectedSubcategoryId))
-        ?.name ||
-      postMeta?.subcategory?.name ||
-      "—",
-    [subcategories, selectedSubcategoryId, postMeta]
-  );
+    if (!result.ok) {
+      showPopup("error", getBackendMessage(result.data, "Không tải được subcategory"));
+      setSubcategories([]);
+      return [];
+    }
+
+    const items = result.data?.subcategories || [];
+    setSubcategories(items);
+    return items;
+  }
 
   const originalCategoryName = postMeta?.category?.name || "—";
   const originalSubcategoryName = postMeta?.subcategory?.name || "—";
@@ -213,27 +195,9 @@ export default function PostUpdatePage() {
 
     try {
       const [categoryResult, postResult] = await Promise.all([
-        getCategoriesApi({ includeInactive: true }),
+        getCategoryOptionsApi({ includeInactive: true }),
         getPostByIdApi(id),
       ]);
-
-      if (!categoryResult.ok) {
-        showPopup(
-          "error",
-          getBackendMessage(categoryResult.data, "Không tải được category")
-        );
-        setLoading(false);
-        return;
-      }
-
-      if (!postResult.ok) {
-        showPopup(
-          "error",
-          getBackendMessage(postResult.data, "Không tải được bài viết")
-        );
-        setLoading(false);
-        return;
-      }
 
       const categoryList = categoryResult.data?.categories || [];
       const post = postResult.data;
@@ -245,20 +209,21 @@ export default function PostUpdatePage() {
       setNewThumbnailPreview("");
       setRemoveThumbnail(false);
 
+      const categoryId = post?.category?.id ? String(post.category.id) : "";
       const subcategoryId = post?.subcategory_id
         ? String(post.subcategory_id)
         : post?.subcategory?.id
         ? String(post.subcategory.id)
         : "";
 
-      const categoryId = post?.category_id
-        ? String(post.category_id)
-        : post?.category?.id
-        ? String(post.category.id)
-        : findCategoryIdBySubcategoryId(categoryList, subcategoryId);
-
       setSelectedCategoryId(categoryId);
       setSelectedSubcategoryId(subcategoryId);
+
+      if (categoryId) {
+        await loadSubcategories(categoryId);
+      } else {
+        setSubcategories([]);
+      }
 
       setForm({
         title: post?.title || "",
@@ -282,12 +247,14 @@ export default function PostUpdatePage() {
     }));
   }
 
-  function handleCategoryChange(e) {
+  async function handleCategoryChange(e) {
     const nextCategoryId = e.target.value;
 
     setSelectedCategoryId(nextCategoryId);
     setSelectedSubcategoryId("");
     setIsSubcategoryUnlocked(false);
+
+    await loadSubcategories(nextCategoryId);
   }
 
   function addHashtagToken(rawValue) {
@@ -409,7 +376,6 @@ export default function PostUpdatePage() {
           "error",
           getBackendMessage(result.data, "Cập nhật bài viết thất bại")
         );
-        setSubmitting(false);
         return;
       }
 
@@ -418,37 +384,6 @@ export default function PostUpdatePage() {
         getBackendMessage(result.data, "Cập nhật bài viết thành công")
       );
       setRedirectToastId(successToastId);
-
-      const updatedPost = result.data?.post;
-      if (updatedPost) {
-        setPostMeta(updatedPost);
-        setExistingThumbnail(updatedPost.thumbnail || null);
-        setRemoveThumbnail(false);
-
-        if (newThumbnailPreview) {
-          URL.revokeObjectURL(newThumbnailPreview);
-        }
-        setNewThumbnailFile(null);
-        setNewThumbnailPreview("");
-
-        const updatedSubcategoryId = updatedPost?.subcategory_id
-          ? String(updatedPost.subcategory_id)
-          : selectedSubcategoryId;
-
-        const updatedCategoryId = updatedPost?.category?.id
-          ? String(updatedPost.category.id)
-          : findCategoryIdBySubcategoryId(categories, updatedSubcategoryId);
-
-        setSelectedCategoryId(updatedCategoryId || selectedCategoryId);
-        setSelectedSubcategoryId(updatedSubcategoryId || selectedSubcategoryId);
-
-        setForm({
-          title: updatedPost.title || "",
-          hashtag: formatHashtagValue(updatedPost.hashtag || ""),
-          status: updatedPost.status ?? true,
-          content: updatedPost.content || "",
-        });
-      }
     } catch (error) {
       showPopup("error", "Có lỗi xảy ra khi cập nhật bài viết");
     } finally {

@@ -195,7 +195,7 @@ export default function AdminLayout({ setIsAuthenticated }) {
       ),
     },
     {
-      label: "Quản lý thông tin trang chủ",
+      label: "Quản lý khối thông tin",
       path: "/info/list",
       paths: ["/info/create", "/info/list", "/info/update"],
       icon: (
